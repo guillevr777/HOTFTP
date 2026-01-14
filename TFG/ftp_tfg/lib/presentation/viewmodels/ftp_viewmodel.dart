@@ -1,19 +1,13 @@
-import '../../domain/entities/remote_file.dart';
-import '../../domain/interfaces/i_get_remote_files.dart';
-import '../../domain/interfaces/i_connect_ftp.dart';
+import 'package:ftp_tfg/data/datasources/fake_datasource.dart';
 
 class FtpViewModel {
-  final IConnectFtp connectFtp;
-  final IGetRemoteFiles getRemoteFiles;
+  final FakeFtpDatasource datasource;
 
-  List<RemoteFile> remoteFiles = [];
+  List<Map<String, dynamic>> remoteFiles = [];
 
-  FtpViewModel({
-    required this.connectFtp,
-    required this.getRemoteFiles,
-  });
+  FtpViewModel(this.datasource);
 
   Future<void> loadFiles(String path) async {
-    remoteFiles = await getRemoteFiles.execute(path);
+    remoteFiles = await datasource.listFiles(path);
   }
 }

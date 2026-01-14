@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ftp_tfg/presentation/viewmodels/ftp_viewmodel.dart';
+import '../viewmodels/ftp_viewmodel.dart';
 
 class FtpScreen extends StatefulWidget {
   final FtpViewModel vm;
@@ -11,21 +11,42 @@ class FtpScreen extends StatefulWidget {
 }
 
 class _FtpScreenState extends State<FtpScreen> {
+  bool loading = true;
+
   @override
   void initState() {
     super.initState();
-    widget.vm.loadFiles("/");
+    _loadFiles();
+  }
+
+  Future<void> _loadFiles() async {
+    await widget.vm.loadFiles("/"); // carga archivos fake
+    setState(() {
+      loading = false; // reconstruye la UI
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("FTP")),
-      body: ListView.builder(
-        itemCount: widget.vm.remoteFiles.length,
-        itemBuilder: (_, i) =>
-            Text(widget.vm.remoteFiles[i].name),
-      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: widget.vm.remoteFiles.length,
+              itemBuilder: (_, index) {
+                final file = widget.vm.remoteFiles[index];
+                return ListTile(
+                  leading: Icon(
+                    file['isDirectory'] ? Icons.folder : Icons.insert_drive_file,
+                  ),
+                  title: Text(file['name']),
+                  subtitle: file['isDirectory']
+                      ? const Text("Carpeta")
+                      : Text("${file['size']} bytes"),
+                );
+              },
+            ),
     );
   }
 }
