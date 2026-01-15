@@ -11,9 +11,15 @@ class FtpRepositoryImpl implements FtpRepository {
   FtpRepositoryImpl(this.datasource);
 
   @override
-  Future<bool> connect(FtpProfile profile) {
-    return datasource.connect(profile);
+Future<bool> connect(FtpProfile profile) async {
+  try {
+    return await datasource.connect(profile);
+  } catch (e) {
+    // Se puede transformar en Failure para Domain si quieres
+    throw Exception("Repositorio: fallo al conectar -> ${e.toString()}");
   }
+}
+
 
   @override
   Future<List<RemoteFile>> getRemoteFiles(String path) async {

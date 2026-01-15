@@ -5,11 +5,18 @@ class FakeFtpDatasource implements FtpDatasource {
   bool _connected = false;
 
   @override
-  Future<bool> connect(FtpProfile profile) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _connected = true;
-    return true; // siempre conecta (fake)
+Future<bool> connect(FtpProfile profile) async {
+  await Future.delayed(const Duration(milliseconds: 500));
+
+  // Simula error si host está vacío
+  if (profile.host.isEmpty) {
+    throw Exception("Host no puede estar vacío");
   }
+
+  _connected = true;
+  return true;
+}
+
 
   @override
   Future<List<Map<String, dynamic>>> listFiles(String path) async {

@@ -9,9 +9,14 @@ class FtpDatasourceImpl implements FtpDatasource {
   FtpDatasourceImpl(this.channel);
 
   @override
-  Future<bool> connect(FtpProfile profile) {
-    return channel.connect(profile);
+Future<bool> connect(FtpProfile profile) async {
+  try {
+    return await channel.connect(profile);
+  } catch (e) {
+    throw Exception("Error conectando al FTP: ${e.toString()}");
   }
+}
+
 
   @override
   Future<List<Map<String, dynamic>>> listFiles(String path) {

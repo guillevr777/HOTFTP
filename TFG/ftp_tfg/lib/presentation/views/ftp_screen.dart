@@ -71,14 +71,23 @@ class _FtpScreenState extends State<FtpScreen> {
                         await vm.connect(profile);
 
                         if (vm.isConnected) {
-                          vm.loadFiles("/");
+                          await vm.loadFiles("/");
                         }
                       },
                 child: const Text("Conectar"),
               ),
+              // 🔴 Mostrar errores
+              if (vm.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    vm.errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
             ],
 
-            // ⏳ CARGANDO
+            // ⏳ INDICADOR DE CARGA
             if (vm.isLoading)
               const Padding(
                 padding: EdgeInsets.all(16),
