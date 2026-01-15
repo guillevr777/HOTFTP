@@ -1,3 +1,4 @@
+/**
 import '../entities/ftp_profile.dart';
 import '../interfaces/i_connect_ftp.dart';
 import '../repositories/ftp_repository.dart';
@@ -12,3 +13,4 @@ class ConnectFtp implements IConnectFtp {
     return repository.connect(profile);
   }
 }
+*/

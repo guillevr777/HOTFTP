@@ -1,13 +1,22 @@
-import 'package:ftp_tfg/data/datasources/fake_datasource.dart';
+import 'package:flutter/foundation.dart';
+import '../../domain/entities/remote_file.dart';
+import '../../domain/interfaces/i_get_remote_files.dart';
 
-class FtpViewModel {
-  final FakeFtpDatasource datasource;
+class FtpViewModel extends ChangeNotifier {
+  final IGetRemoteFiles getRemoteFiles;
 
-  List<Map<String, dynamic>> remoteFiles = [];
+  List<RemoteFile> remoteFiles = [];
+  bool isLoading = false;
 
-  FtpViewModel(this.datasource);
+  FtpViewModel(this.getRemoteFiles);
 
   Future<void> loadFiles(String path) async {
-    remoteFiles = await datasource.listFiles(path);
+    isLoading = true;
+    notifyListeners();
+
+    remoteFiles = await getRemoteFiles.execute(path);
+
+    isLoading = false;
+    notifyListeners();
   }
 }
