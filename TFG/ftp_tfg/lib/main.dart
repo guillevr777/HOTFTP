@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:ftp_tfg/core/services/ftp_native_channel.dart';
+import 'package:ftp_tfg/data/datasources/ftp_datasource_impl.dart';
 import 'package:ftp_tfg/data/repositories/ftp_repository.dart';
-import 'data/datasources/fake_datasource.dart';
 import 'domain/usecases/get_remote_files.dart';
 import 'presentation/viewmodels/ftp_viewmodel.dart';
 import 'presentation/views/ftp_screen.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  final datasource = FakeFtpDatasource(); 
-//final datasource = FtpDatasourceImpl(); ← cuando esté listo
+//final datasource = FakeFtpDatasource(); 
+  final datasource = FtpDatasourceImpl(FtpNativeChannel());
   final repository = FtpRepositoryImpl(datasource);
   final getRemoteFiles = GetRemoteFiles(repository);
 

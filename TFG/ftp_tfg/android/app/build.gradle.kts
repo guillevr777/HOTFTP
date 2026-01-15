@@ -5,6 +5,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    implementation 'commons-net:commons-net:3.9.0'
+}
+
 android {
     namespace = "com.example.ftp_tfg"
     compileSdk = flutter.compileSdkVersion
