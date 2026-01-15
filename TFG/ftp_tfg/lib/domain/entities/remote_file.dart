@@ -4,7 +4,7 @@ class RemoteFile {
   final bool isDirectory;
   final int size;
 
-  const RemoteFile({
+  RemoteFile({
     required this.name,
     required this.path,
     required this.isDirectory,
