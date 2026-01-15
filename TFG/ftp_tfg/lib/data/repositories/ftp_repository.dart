@@ -1,6 +1,7 @@
 import 'package:ftp_tfg/data/interfaces/ftp_datasource.dart';
-import '../../domain/entities/ftp_profile.dart';
+
 import '../../domain/entities/remote_file.dart';
+import '../../domain/entities/sync_conflict.dart';
 import '../../domain/repositories/ftp_repository.dart';
 import '../mappers/remote_file_mapper.dart';
 
@@ -10,33 +11,34 @@ class FtpRepositoryImpl implements FtpRepository {
   FtpRepositoryImpl(this.datasource);
 
   @override
-  Future<bool> connect(FtpProfile profile) {
-    return datasource.connect(profile);
-  }
-
-  @override
   Future<List<RemoteFile>> getRemoteFiles(String path) async {
-    final data = await datasource.listFiles(path);
+    final data = await datasource.listRemoteFiles(path);
     return data.map(RemoteFileMapper.fromMap).toList();
   }
 
   @override
-  Future<List<String>> getLocalFiles(String localPath) async {
-    return ['file1.txt', 'file2.txt'];
+  Future<List<String>> getLocalFiles(String path) {
+    return datasource.listLocalFiles(path);
   }
 
   @override
-  Future<void> uploadFile(String localFile, String remotePath) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+  Future<void> uploadFile(String localPath, String remotePath) {
+    return datasource.uploadFile(localPath, remotePath);
   }
 
   @override
-  Future<void> downloadFile(RemoteFile remoteFile, String localPath) async {
-    await Future.delayed(const Duration(milliseconds: 200));
+  Future<void> downloadFile(RemoteFile file, String localPath) {
+    return datasource.downloadFile(file.name, localPath);
   }
 
   @override
-  Future<void> syncBidirectional(String localPath, String remotePath) async {
-    await Future.delayed(const Duration(seconds: 1));
+  Future<List<SyncConflict>> detectConflicts(String localPath, String remotePath) async {
+    final local = await datasource.listLocalFiles(localPath);
+    final remote = await datasource.listRemoteFiles(remotePath);
+    final remoteNames = remote.map((e) => e['name']).toSet();
+
+    return local.where(remoteNames.contains).map(
+      (f) => SyncConflict(fileName: f, localExists: true, remoteExists: true),
+    ).toList();
   }
 }

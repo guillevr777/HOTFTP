@@ -1,6 +1,6 @@
-import '../../domain/entities/ftp_profile.dart';
-
 abstract class FtpDatasource {
-  Future<bool> connect(FtpProfile profile);
-  Future<List<Map<String, dynamic>>> listFiles(String path);
+  Future<List<Map<String, dynamic>>> listRemoteFiles(String path);
+  Future<List<String>> listLocalFiles(String path);
+  Future<void> uploadFile(String localFilePath, String remotePath);
+  Future<void> downloadFile(String remoteFileName, String localPath);
 }

@@ -1,80 +1,57 @@
-import 'package:flutter/foundation.dart';
-import '../../domain/entities/ftp_profile.dart';
+import 'package:flutter/material.dart';
 import '../../domain/entities/remote_file.dart';
-import '../../domain/entities/sync_action.dart';
-import '../../domain/interfaces/i_connect_ftp.dart';
-import '../../domain/interfaces/i_get_remote_files.dart';
-import '../../domain/interfaces/i_sync_folder.dart';
+import '../../domain/usecases/get_remote_files.dart';
+import '../../data/datasources/ftp_real_datasource.dart';
 
 class FtpViewModel extends ChangeNotifier {
-  final IConnectFtp connectFtp;
-  final IGetRemoteFiles getRemoteFiles;
-  final ISyncFolder syncFolder;
+  final GetRemoteFiles getRemoteFiles;
 
   List<RemoteFile> remoteFiles = [];
-  bool isConnected = false;
   bool isLoading = false;
-  String? errorMessage;
+  FtpRealDatasource? _datasource;
 
-  FtpViewModel({
-    required this.connectFtp,
-    required this.getRemoteFiles,
-    required this.syncFolder,
-  });
+  FtpViewModel({required this.getRemoteFiles});
 
-  Future<void> connect(FtpProfile profile) async {
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners();
+  /// Conectar a un servidor FTP
+  Future<bool> connect({
+  required String host,
+  int port = 21,
+  required String username,
+  required String password,
+}) async {
+  try {
+    print("Intentando conectar a $host:$port con usuario $username");
 
-    try {
-      isConnected = await connectFtp.execute(profile);
-    } catch (e) {
-      isConnected = false;
-      errorMessage = e.toString();
-    }
+    _datasource = FtpRealDatasource(
+      host: host,
+      user: username,
+      pass: password,
+      port: port,
+    );
 
-    isLoading = false;
-    notifyListeners();
+    // Probar conexión real
+    await _datasource!.listRemoteFiles('/');
+
+    print("Conexión FTP correcta");
+    return true;
+  } catch (e, stackTrace) {
+    print("ERROR DE CONEXIÓN FTP");
+    print(e);
+    print(stackTrace);
+    return false;
   }
+}
 
+
+  /// Cargar archivos remotos
   Future<void> loadFiles(String path) async {
-    if (!isConnected) return;
+    if (_datasource == null) return;
 
     isLoading = true;
-    errorMessage = null;
     notifyListeners();
-
-    try {
-      remoteFiles = await getRemoteFiles.execute(path);
-    } catch (e) {
-      remoteFiles = [];
-      errorMessage = e.toString();
-    }
-
+    final repo = getRemoteFiles.repository; // Usamos el repository actual
+    remoteFiles = await repo.getRemoteFiles(path);
     isLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> sync(SyncAction action) async {
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners();
-
-    try {
-      await syncFolder.execute(action);
-    } catch (e) {
-      errorMessage = e.toString();
-    }
-
-    isLoading = false;
-    notifyListeners();
-  }
-
-  void disconnect() {
-    isConnected = false;
-    remoteFiles = [];
-    errorMessage = null;
     notifyListeners();
   }
 }

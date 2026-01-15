@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    implementation 'commons-net:commons-net:3.9.0'
+    implementation("commons-net:commons-net:3.9.0")
 }
 
 android {
@@ -20,7 +20,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17" 
     }
 
     defaultConfig {

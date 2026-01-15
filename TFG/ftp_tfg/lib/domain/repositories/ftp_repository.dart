@@ -1,13 +1,10 @@
-import '../entities/ftp_profile.dart';
 import '../entities/remote_file.dart';
+import '../entities/sync_conflict.dart';
 
 abstract class FtpRepository {
-  Future<bool> connect(FtpProfile profile);
   Future<List<RemoteFile>> getRemoteFiles(String path);
-
-  // Para sincronización
-  Future<List<String>> getLocalFiles(String localPath);
-  Future<void> uploadFile(String localFile, String remotePath);
-  Future<void> downloadFile(RemoteFile remoteFile, String localPath);
-  Future<void> syncBidirectional(String localPath, String remotePath);
+  Future<List<String>> getLocalFiles(String path);
+  Future<void> uploadFile(String localPath, String remotePath);
+  Future<void> downloadFile(RemoteFile file, String localPath);
+  Future<List<SyncConflict>> detectConflicts(String localPath, String remotePath);
 }

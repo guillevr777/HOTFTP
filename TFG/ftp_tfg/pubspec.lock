@@ -75,6 +75,22 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  ftpconnect:
+    dependency: "direct main"
+    description:
+      name: ftpconnect
+      sha256: a9ebac24a50b17dc9a1101fff85c3729fd8c16ec41346b0fa6e549616e23b2f6
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.10"
+  intl:
+    dependency: transitive
+    description:
+      name: intl
+      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.20.2"
   leak_tracker:
     dependency: transitive
     description:
@@ -148,7 +164,7 @@ packages:
     source: hosted
     version: "1.9.1"
   provider:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: provider
       sha256: "4e82183fa20e5ca25703ead7e05de9e4cceed1fbd1eadc1ac3cb6f565a09f272"

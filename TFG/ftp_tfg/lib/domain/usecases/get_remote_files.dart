@@ -1,13 +1,11 @@
-import '../entities/remote_file.dart';
-import '../interfaces/i_get_remote_files.dart';
 import '../repositories/ftp_repository.dart';
+import '../entities/remote_file.dart';
 
-class GetRemoteFiles implements IGetRemoteFiles {
+class GetRemoteFiles {
   final FtpRepository repository;
 
   GetRemoteFiles(this.repository);
 
-  @override
   Future<List<RemoteFile>> execute(String path) {
     return repository.getRemoteFiles(path);
   }

@@ -1,28 +1,23 @@
+
 import 'package:ftp_tfg/data/interfaces/ftp_datasource.dart';
-import '../../domain/entities/ftp_profile.dart';
 
 class FakeFtpDatasource implements FtpDatasource {
-  bool _connected = false;
-
   @override
-  Future<bool> connect(FtpProfile profile) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (profile.host.isEmpty) {
-      throw Exception("Host no puede estar vacío");
-    }
-    _connected = true;
-    return true;
-  }
-
-  @override
-  Future<List<Map<String, dynamic>>> listFiles(String path) async {
-    if (!_connected) return [];
-
-    await Future.delayed(const Duration(seconds: 1));
+  Future<List<Map<String, dynamic>>> listRemoteFiles(String path) async {
     return [
-      {'name': 'Documents', 'path': '$path/Documents', 'isDirectory': true, 'size': 0},
-      {'name': 'Images', 'path': '$path/Images', 'isDirectory': true, 'size': 0},
-      {'name': 'file.txt', 'path': '$path/file.txt', 'isDirectory': false, 'size': 1200},
+      {"name": "file1.txt", "size": 1200, "isDir": false},
+      {"name": "folder", "size": 0, "isDir": true},
     ];
   }
+
+  @override
+  Future<List<String>> listLocalFiles(String path) async {
+    return ["file1.txt", "local_only.txt"];
+  }
+
+  @override
+  Future<void> uploadFile(String localFilePath, String remotePath) async {}
+
+  @override
+  Future<void> downloadFile(String remoteFileName, String localPath) async {}
 }

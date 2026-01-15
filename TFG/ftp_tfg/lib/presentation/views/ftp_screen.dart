@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../../domain/entities/ftp_profile.dart';
 import '../viewmodels/ftp_viewmodel.dart';
 
 class FtpScreen extends StatefulWidget {
@@ -12,109 +10,94 @@ class FtpScreen extends StatefulWidget {
 }
 
 class _FtpScreenState extends State<FtpScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _hostController = TextEditingController();
-  final _portController = TextEditingController(text: "21");
+  final _portController = TextEditingController(text: '21');
   final _userController = TextEditingController();
   final _passController = TextEditingController();
-
-  @override
-  void dispose() {
-    _hostController.dispose();
-    _portController.dispose();
-    _userController.dispose();
-    _passController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<FtpViewModel>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text("FTP Client")),
+      appBar: AppBar(title: const Text('Cliente FTP TFG')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 🔌 FORMULARIO DE CONEXIÓN
-            if (!vm.isConnected) ...[
-              TextField(
-                controller: _hostController,
-                decoration: const InputDecoration(labelText: "Servidor FTP"),
-              ),
-              TextField(
-                controller: _portController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Puerto"),
-              ),
-              TextField(
-                controller: _userController,
-                decoration: const InputDecoration(labelText: "Usuario"),
-              ),
-              TextField(
-                controller: _passController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Contraseña"),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: vm.isLoading
-                    ? null
-                    : () async {
-                        final profile = FtpProfile(
+            // FORMULARIO DE CONEXIÓN
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _hostController,
+                    decoration: const InputDecoration(labelText: 'IP / Host'),
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                  ),
+                  TextFormField(
+                    controller: _portController,
+                    decoration: const InputDecoration(labelText: 'Puerto'),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                  ),
+                  TextFormField(
+                    controller: _userController,
+                    decoration: const InputDecoration(labelText: 'Usuario'),
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                  ),
+                  TextFormField(
+                    controller: _passController,
+                    decoration: const InputDecoration(labelText: 'Contraseña'),
+                    obscureText: true,
+                    validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () async {
+                        if (_formKey.currentState!.validate()) {
+                          final connected = await vm.connect(
                           host: _hostController.text,
                           port: int.tryParse(_portController.text) ?? 21,
                           username: _userController.text,
                           password: _passController.text,
                         );
 
-                        await vm.connect(profile);
-
-                        if (vm.isConnected) {
-                          await vm.loadFiles("/");
+                        if (connected) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Conectado correctamente'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          await vm.loadFiles('/');
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Error al conectar. Revisa credenciales o servidor'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
                         }
-                      },
-                child: const Text("Conectar"),
-              ),
-              // 🔴 Mostrar errores
-              if (vm.errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Text(
-                    vm.errorMessage!,
-                    style: const TextStyle(color: Colors.red),
+                      }
+                    },
+                    child: const Text('Conectar'),
                   ),
-                ),
-            ],
-
-            // ⏳ INDICADOR DE CARGA
-            if (vm.isLoading)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
+                ],
               ),
-
-            // 📂 LISTADO DE ARCHIVOS
-            if (vm.isConnected && !vm.isLoading)
-              Expanded(
-                child: ListView.builder(
-                  itemCount: vm.remoteFiles.length,
-                  itemBuilder: (_, i) {
-                    final file = vm.remoteFiles[i];
-                    return ListTile(
-                      leading: Icon(
-                        file.isDirectory
-                            ? Icons.folder
-                            : Icons.insert_drive_file,
-                      ),
-                      title: Text(file.name),
-                      onTap: file.isDirectory
-                          ? () => vm.loadFiles(file.path)
-                          : null,
-                    );
-                  },
-                ),
+            ),
+            const SizedBox(height: 20),
+            if (vm.isLoading) const CircularProgressIndicator(),
+            // LISTA DE ARCHIVOS REMOTOS
+            Expanded(
+              child: ListView(
+                children: vm.remoteFiles.map((f) => ListTile(
+                  leading: Icon(f.isDirectory ? Icons.folder : Icons.insert_drive_file),
+                  title: Text(f.name),
+                )).toList(),
               ),
+            ),
           ],
         ),
       ),
