@@ -19,15 +19,17 @@ void main() {
   // Use case
   final getRemoteFiles = GetRemoteFiles(repository);
 
+  void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(
     ChangeNotifierProvider(
-      create: (_) => FtpViewModel(
-        getRemoteFiles: getRemoteFiles,
-      ),
-      child: const MyApp(),
+      create: (_) => FtpViewModel(),
+      child: MyApp(),
     ),
   );
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

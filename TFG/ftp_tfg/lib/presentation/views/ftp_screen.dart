@@ -57,29 +57,12 @@ class _FtpScreenState extends State<FtpScreen> {
                   ElevatedButton(
                     onPressed: () async {
                         if (_formKey.currentState!.validate()) {
-                          final connected = await vm.connect(
+                          await vm.loadFiles('/');(
                           host: _hostController.text,
                           port: int.tryParse(_portController.text) ?? 21,
                           username: _userController.text,
                           password: _passController.text,
                         );
-
-                        if (connected) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Conectado correctamente'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                          await vm.loadFiles('/');
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Error al conectar. Revisa credenciales o servidor'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
                       }
                     },
                     child: const Text('Conectar'),
