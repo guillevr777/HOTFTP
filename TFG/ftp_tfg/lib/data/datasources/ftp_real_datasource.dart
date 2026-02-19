@@ -7,11 +7,18 @@ class FtpRealDatasource implements FtpDatasource {
   FtpRealDatasource();
 
   FTPConnect _createClient(Map<String, dynamic> config) {
-    final host = config['host'] ?? '';
+    String host = config['host'] ?? '';
     final port = config['port'] ?? 21;
     final user = config['username'] ?? '';
     final useFTPS = config['useFTPS'] == true;
     final passive = config['passiveMode'] ?? true;
+
+    // Fix connection from Android Emulator to Host Localhost
+    if (Platform.isAndroid && (host == '127.0.0.1' || host == 'localhost')) {
+      debugPrint("HOTFTP: Remapping $host to 10.0.2.2 for Android Emulator");
+      host = '10.0.2.2';
+    }
+
     debugPrint(
       "HOTFTP: _createClient - Host: $host, Port: $port, User: $user, FTPS: $useFTPS, Passive: $passive",
     );
