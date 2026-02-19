@@ -1,3 +1,4 @@
+﻿import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 
@@ -18,7 +19,7 @@ class FtpNativeChannel {
       );
       return result ?? false;
     } on PlatformException catch (e) {
-      print("Error conectando al FTP: ${e.message}");
+      debugPrint("Error conectando al FTP: ${e.message}");
       return false;
     }
   }
@@ -34,7 +35,7 @@ class FtpNativeChannel {
       // Convertir List<dynamic> a List<Map<String,dynamic>>
       return (result ?? []).map((e) {
         final map = Map<String, dynamic>.from(e as Map);
-        // Asegúrate que tenga todos los campos
+        // AsegÃºrate que tenga todos los campos
         return {
           "name": map["name"] ?? "",
           "size": map["size"] ?? 0,
@@ -42,7 +43,7 @@ class FtpNativeChannel {
         };
       }).toList();
     } on PlatformException catch (e) {
-      print("Error listando archivos: ${e.message}");
+      debugPrint("Error listando archivos: ${e.message}");
       return [];
     }
   }
@@ -59,7 +60,7 @@ class FtpNativeChannel {
       );
       return result ?? false;
     } on PlatformException catch (e) {
-      print("Error subiendo archivo: ${e.message}");
+      debugPrint("Error subiendo archivo: ${e.message}");
       return false;
     }
   }
@@ -76,8 +77,9 @@ class FtpNativeChannel {
       );
       return result ?? false;
     } on PlatformException catch (e) {
-      print("Error descargando archivo: ${e.message}");
+      debugPrint("Error descargando archivo: ${e.message}");
       return false;
     }
   }
 }
+
