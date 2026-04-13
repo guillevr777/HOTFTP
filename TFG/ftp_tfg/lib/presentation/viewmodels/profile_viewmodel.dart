@@ -1,11 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/repositories/ftp_repository.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   final FtpRepository repository;
+  final String ownerId;
 
-  ProfileViewModel({required this.repository});
+  ProfileViewModel({required this.repository, required this.ownerId});
 
   List<FtpProfile> profiles = [];
   bool isLoading = false;
@@ -15,18 +17,18 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> loadProfiles() async {
     isLoading = true;
     notifyListeners();
-    profiles = await repository.getProfiles();
+    profiles = await repository.getProfiles(ownerId);
     isLoading = false;
     notifyListeners();
   }
 
   Future<void> saveProfile(FtpProfile profile) async {
-    await repository.saveProfile(profile);
+    await repository.saveProfile(profile, ownerId);
     await loadProfiles();
   }
 
   Future<void> deleteProfile(int id) async {
-    await repository.deleteProfile(id);
+    await repository.deleteProfile(id, ownerId);
     await loadProfiles();
   }
 

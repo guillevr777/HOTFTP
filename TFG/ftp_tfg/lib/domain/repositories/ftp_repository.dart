@@ -1,6 +1,6 @@
-﻿import '../entities/remote_file.dart';
-import '../entities/sync_conflict.dart';
 import '../entities/ftp_profile.dart';
+import '../entities/remote_file.dart';
+import '../entities/sync_conflict.dart';
 import '../entities/sync_record.dart';
 
 abstract class FtpRepository {
@@ -26,10 +26,10 @@ abstract class FtpRepository {
     String remotePath,
     FtpProfile profile,
   );
-  Future<List<FtpProfile>> getProfiles();
-  Future<int> saveProfile(FtpProfile profile);
-  Future<void> deleteProfile(int id);
+  Future<List<FtpProfile>> getProfiles(String ownerId);
+  Future<int> saveProfile(FtpProfile profile, String ownerId);
+  Future<void> deleteProfile(int id, String ownerId);
   Future<bool> testConnection(FtpProfile profile);
-  Future<List<SyncRecord>> getSyncHistory();
+  Future<List<SyncRecord>> getSyncHistory(String ownerId);
   Future<void> saveSyncRecord(SyncRecord record);
 }

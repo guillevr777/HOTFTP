@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/sync_record.dart';
-import '../../viewmodels/sync_viewmodel.dart';
-import '../../viewmodels/profile_viewmodel.dart';
 import '../../../theme/app_theme.dart';
+import '../../viewmodels/auth_viewmodel.dart';
+import '../../viewmodels/profile_viewmodel.dart';
+import '../../viewmodels/sync_viewmodel.dart';
 
 class HistoryScreen extends StatelessWidget {
   final FtpProfile profile;
@@ -16,6 +18,7 @@ class HistoryScreen extends StatelessWidget {
       create: (_) => SyncViewModel(
         repository: context.read<ProfileViewModel>().repository,
         profile: profile,
+        ownerId: context.read<AuthViewModel>().currentUser?.uid ?? '',
       )..loadHistory(),
       child: const _HistoryBody(),
     );
@@ -38,7 +41,10 @@ class _HistoryBody extends StatelessWidget {
                 children: [
                   Icon(Icons.history, size: 64, color: AppTheme.onSurfaceMuted),
                   SizedBox(height: 16),
-                  Text('Sin datos disponibles', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+                  Text(
+                    'Sin datos disponibles',
+                    style: TextStyle(color: AppTheme.onSurfaceMuted),
+                  ),
                 ],
               ),
             )
@@ -83,26 +89,48 @@ class _HistoryCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     record.mode,
-                    style: const TextStyle(color: AppTheme.primary, fontSize: 11),
+                    style: const TextStyle(
+                      color: AppTheme.primary,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            _InfoRow(icon: Icons.upload, label: 'Transferidos', value: '${record.filesTransferred}'),
+            _InfoRow(
+              icon: Icons.upload,
+              label: 'Transferidos',
+              value: '${record.filesTransferred}',
+            ),
             const SizedBox(height: 4),
-            _InfoRow(icon: Icons.skip_next, label: 'Omitidos', value: '${record.filesSkipped}'),
+            _InfoRow(
+              icon: Icons.skip_next,
+              label: 'Omitidos',
+              value: '${record.filesSkipped}',
+            ),
             const SizedBox(height: 4),
-            _InfoRow(icon: Icons.folder_outlined, label: 'Local', value: record.localPath),
+            _InfoRow(
+              icon: Icons.folder_outlined,
+              label: 'Local',
+              value: record.localPath,
+            ),
             const SizedBox(height: 4),
-            _InfoRow(icon: Icons.cloud_outlined, label: 'Remota', value: record.remotePath),
+            _InfoRow(
+              icon: Icons.cloud_outlined,
+              label: 'Remota',
+              value: record.remotePath,
+            ),
             if (hasError) ...[
               const SizedBox(height: 8),
               Container(
@@ -111,7 +139,13 @@ class _HistoryCard extends StatelessWidget {
                   color: AppTheme.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(record.errorMessage!, style: const TextStyle(color: AppTheme.error, fontSize: 12)),
+                child: Text(
+                  record.errorMessage!,
+                  style: const TextStyle(
+                    color: AppTheme.error,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
           ],
@@ -125,7 +159,11 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -133,9 +171,19 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: AppTheme.onSurfaceMuted),
         const SizedBox(width: 6),
-        Text('$label: ', style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            color: AppTheme.onSurfaceMuted,
+            fontSize: 12,
+          ),
+        ),
         Expanded(
-          child: Text(value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

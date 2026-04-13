@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../viewmodels/profile_viewmodel.dart';
+
 import '../../../domain/entities/ftp_profile.dart';
-import 'profile_form_screen.dart';
-import '../browser/remote_browser_screen.dart';
 import '../../../theme/app_theme.dart';
+import '../../viewmodels/auth_viewmodel.dart';
+import '../../viewmodels/profile_viewmodel.dart';
+import '../browser/remote_browser_screen.dart';
+import 'profile_form_screen.dart';
 
 class ProfileListScreen extends StatefulWidget {
   const ProfileListScreen({super.key});
@@ -24,7 +26,8 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<ProfileViewModel>();
+    final profileVm = context.watch<ProfileViewModel>();
+    final authVm = context.watch<AuthViewModel>();
 
     return Scaffold(
       appBar: AppBar(
@@ -32,15 +35,38 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
           children: [
             const Icon(Icons.cloud_sync, color: AppTheme.primary),
             const SizedBox(width: 10),
-            const Text('HOTFTP'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('HOTFTP'),
+                Text(
+                  authVm.currentUser?.displayName ?? '',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.onSurfaceMuted,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            icon: const Icon(Icons.logout),
+            onPressed: authVm.isLoading
+                ? null
+                : () async {
+                    await authVm.logout();
+                  },
+          ),
+        ],
       ),
-      body: vm.isLoading
+      body: profileVm.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : vm.profiles.isEmpty
+          : profileVm.profiles.isEmpty
               ? _buildEmptyState(context)
-              : _buildProfileList(context, vm),
+              : _buildProfileList(context, profileVm),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(context, null),
         icon: const Icon(Icons.add),
@@ -93,14 +119,14 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
     );
   }
 
-      void _openForm(BuildContext context, FtpProfile? profile) async {
+  Future<void> _openForm(BuildContext context, FtpProfile? profile) async {
     final vm = context.read<ProfileViewModel>();
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ProfileFormScreen(profile: profile)),
     );
     if (mounted) {
-       vm.loadProfiles();
+      await vm.loadProfiles();
     }
   }
 
@@ -111,20 +137,30 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, ProfileViewModel vm, FtpProfile profile) {
+  void _confirmDelete(
+    BuildContext context,
+    ProfileViewModel vm,
+    FtpProfile profile,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar perfil'),
         content: Text('Eliminar "${profile.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               vm.deleteProfile(profile.id!);
             },
-            child: const Text('Eliminar', style: TextStyle(color: AppTheme.error)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: AppTheme.error),
+            ),
           ),
         ],
       ),
@@ -187,7 +223,10 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 if (profile.useFTPS)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.success.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -228,10 +267,3 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1053228365631",
+    "project_id": "tfgftp",
+    "storage_bucket": "tfgftp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053228365631:android:6f643200e910fe7f3d058a",
+        "android_client_info": {
+          "package_name": "com.example.ftp_tfg"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1053228365631-9g7d2tnh1lg052n3lkpmrc4oi3lv6m6d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ftp_tfg",
+            "certificate_hash": "fe195e138935bbf0d2a9c24dcb57f96d75c86dfa"
+          }
+        },
+        {
+          "client_id": "1053228365631-o83pv4rhu45gqs0f1ptgr4th2q18fpj9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAiHUsfEsdGvw4oHFfWTFCUJSOQIjUGtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1053228365631-o83pv4rhu45gqs0f1ptgr4th2q18fpj9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1053228365631-l059rpe4d3jmc5ahbbi0a0d993l4al00.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.ftpTfg"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

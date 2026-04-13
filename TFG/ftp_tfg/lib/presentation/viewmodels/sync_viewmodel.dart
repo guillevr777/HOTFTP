@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
@@ -9,7 +10,13 @@ enum SyncMode { push, pull, bidirectional }
 class SyncViewModel extends ChangeNotifier {
   final FtpRepository repository;
   final FtpProfile profile;
-  SyncViewModel({required this.repository, required this.profile});
+  final String ownerId;
+  SyncViewModel({
+    required this.repository,
+    required this.profile,
+    required this.ownerId,
+  });
+
   SyncMode syncMode = SyncMode.bidirectional;
   String localPath = '/storage/emulated/0/Download';
   String remotePath = '/';
@@ -42,7 +49,7 @@ class SyncViewModel extends ChangeNotifier {
         for (final lf in localFiles) {
           final alreadyExists = remoteFiles.any((rf) => rf.name == lf);
           if (!alreadyExists) {
-            await repository.uploadFile("$localPath/$lf", remotePath, profile);
+            await repository.uploadFile('$localPath/$lf', remotePath, profile);
             filesTransferred++;
           } else {
             filesSkipped++;
@@ -64,25 +71,28 @@ class SyncViewModel extends ChangeNotifier {
           }
         }
       }
-      await repository.saveSyncRecord(SyncRecord(
-        profileId: profile.id ?? 0,
-        date: DateTime.now(),
-        localPath: localPath,
-        remotePath: remotePath,
-        mode: syncMode.name,
-        filesTransferred: filesTransferred,
-        filesSkipped: filesSkipped,
-      ));
+      await repository.saveSyncRecord(
+        SyncRecord(
+          ownerId: ownerId,
+          profileId: profile.id ?? 0,
+          date: DateTime.now(),
+          localPath: localPath,
+          remotePath: remotePath,
+          mode: syncMode.name,
+          filesTransferred: filesTransferred,
+          filesSkipped: filesSkipped,
+        ),
+      );
       isDone = true;
     } catch (e) {
-      error = "Error durante la sincronizacion: $e";
+      error = 'Error durante la sincronizacion: $e';
     }
     isSyncing = false;
     notifyListeners();
   }
 
   Future<void> loadHistory() async {
-    history = await repository.getSyncHistory();
+    history = await repository.getSyncHistory(ownerId);
     notifyListeners();
   }
 }

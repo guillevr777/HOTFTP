@@ -1,13 +1,15 @@
-﻿import 'dart:io';
+import 'dart:io';
+
 import 'package:path_provider/path_provider.dart';
-import 'package:ftp_tfg/data/interfaces/ftp_datasource.dart';
-import "../../domain/entities/remote_file.dart";
-import "../../domain/entities/sync_conflict.dart";
-import "../../domain/entities/ftp_profile.dart";
-import "../../domain/entities/sync_record.dart";
-import "../../domain/repositories/ftp_repository.dart";
-import "../mappers/remote_file_mapper.dart";
-import "../local/database_helper.dart";
+
+import '../../domain/entities/ftp_profile.dart';
+import '../../domain/entities/remote_file.dart';
+import '../../domain/entities/sync_conflict.dart';
+import '../../domain/entities/sync_record.dart';
+import '../../domain/repositories/ftp_repository.dart';
+import '../interfaces/ftp_datasource.dart';
+import '../local/database_helper.dart';
+import '../mappers/remote_file_mapper.dart';
 
 class FtpRepositoryImpl implements FtpRepository {
   final FtpDatasource datasource;
@@ -17,12 +19,12 @@ class FtpRepositoryImpl implements FtpRepository {
 
   Map<String, dynamic> _getConfig(FtpProfile profile) {
     return {
-      "host": profile.host,
-      "port": profile.port,
-      "username": profile.username,
-      "password": profile.password,
-      "useFTPS": profile.useFTPS,
-      "passiveMode": profile.passiveMode,
+      'host': profile.host,
+      'port': profile.port,
+      'username': profile.username,
+      'password': profile.password,
+      'useFTPS': profile.useFTPS,
+      'passiveMode': profile.passiveMode,
     };
   }
 
@@ -65,15 +67,13 @@ class FtpRepositoryImpl implements FtpRepository {
     FtpProfile profile,
   ) async {
     final tempDir = await getTemporaryDirectory();
-    final cacheDir = Directory("${tempDir.path}/thumbnails");
+    final cacheDir = Directory('${tempDir.path}/thumbnails');
     if (!cacheDir.existsSync()) {
       cacheDir.createSync(recursive: true);
     }
-    // Usamos un hash o el nombre para el archivo de cache
-    final localPath = "${cacheDir.path}/${profile.id}_${file.name}";
+    final localPath = '${cacheDir.path}/${profile.id}_${file.name}';
     final localFile = File(localPath);
 
-    // Si ya existe, lo devolvemos
     if (localFile.existsSync()) {
       return localPath;
     }
@@ -98,7 +98,7 @@ class FtpRepositoryImpl implements FtpRepository {
       remotePath,
       _getConfig(profile),
     );
-    final remoteNames = remote.map((e) => e["name"]).toSet();
+    final remoteNames = remote.map((e) => e['name']).toSet();
     return local
         .where(remoteNames.contains)
         .map(
@@ -109,19 +109,21 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<List<FtpProfile>> getProfiles() => _db.getProfiles();
+  Future<List<FtpProfile>> getProfiles(String ownerId) =>
+      _db.getProfiles(ownerId);
 
   @override
-  Future<int> saveProfile(FtpProfile profile) {
+  Future<int> saveProfile(FtpProfile profile, String ownerId) {
     if (profile.id == null) {
-      return _db.insertProfile(profile);
+      return _db.insertProfile(profile, ownerId);
     } else {
-      return _db.updateProfile(profile).then((_) => profile.id!);
+      return _db.updateProfile(profile, ownerId).then((_) => profile.id!);
     }
   }
 
   @override
-  Future<void> deleteProfile(int id) => _db.deleteProfile(id);
+  Future<void> deleteProfile(int id, String ownerId) =>
+      _db.deleteProfile(id, ownerId);
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
@@ -129,7 +131,8 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<List<SyncRecord>> getSyncHistory() => _db.getSyncHistory();
+  Future<List<SyncRecord>> getSyncHistory(String ownerId) =>
+      _db.getSyncHistory(ownerId);
 
   @override
   Future<void> saveSyncRecord(SyncRecord record) =>

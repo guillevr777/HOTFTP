@@ -1,7 +1,10 @@
-﻿import '../repositories/ftp_repository.dart';
+import '../repositories/ftp_repository.dart';
 
 class DeleteProfile {
   final FtpRepository repository;
+
   DeleteProfile(this.repository);
-  Future<void> execute(int id) => repository.deleteProfile(id);
+
+  Future<void> execute(int id, String ownerId) =>
+      repository.deleteProfile(id, ownerId);
 }
