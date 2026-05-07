@@ -1,8 +1,9 @@
-
-import 'package:firebase_core/firebase_core.dart';
+﻿import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 class DefaultFirebaseOptions {
+  // OAuth client used by Google Sign-In on native platforms.
+  static const String googleWebClientId = '1053228365631-o83pv4rhu45gqs0f1ptgr4th2q18fpj9.apps.googleusercontent.com';
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       return web;
@@ -24,57 +25,61 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:android:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    storageBucket: 'replace-me.appspot.com',
+    apiKey: 'AIzaSyBAiHUsfEsdGvw4oHFfWTFCUJSOQIjUGtw',
+    appId: '1:1053228365631:android:6f643200e910fe7f3d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    storageBucket: 'tfgftp.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:ios:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    storageBucket: 'replace-me.appspot.com',
-    iosClientId: 'replace-me.apps.googleusercontent.com',
-    iosBundleId: 'com.example.ftp_tfg',
+    apiKey: 'AIzaSyD6tuiSgOZKHsfaAkLgZvbhpBhFmV4eXb0',
+    appId: '1:1053228365631:ios:a4dcf2095540c3843d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    storageBucket: 'tfgftp.firebasestorage.app',
+    iosClientId:
+        '1053228365631-l059rpe4d3jmc5ahbbi0a0d993l4al00.apps.googleusercontent.com',
+    iosBundleId: 'com.example.ftpTfg',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:macos:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    storageBucket: 'replace-me.appspot.com',
-    iosClientId: 'replace-me.apps.googleusercontent.com',
-    iosBundleId: 'com.example.ftp_tfg',
+    apiKey: 'AIzaSyD6tuiSgOZKHsfaAkLgZvbhpBhFmV4eXb0',
+    appId: '1:1053228365631:ios:a4dcf2095540c3843d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    storageBucket: 'tfgftp.firebasestorage.app',
+    iosClientId:
+        '1053228365631-l059rpe4d3jmc5ahbbi0a0d993l4al00.apps.googleusercontent.com',
+    iosBundleId: 'com.example.ftpTfg',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:web:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    authDomain: 'replace-me.firebaseapp.com',
-    storageBucket: 'replace-me.appspot.com',
+    apiKey: 'AIzaSyBAiHUsfEsdGvw4oHFfWTFCUJSOQIjUGtw',
+    appId: '1:1053228365631:web:d7b23f96026816b23d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    authDomain: 'tfgftp.firebaseapp.com',
+    storageBucket: 'tfgftp.firebasestorage.app',
   );
 
   static const FirebaseOptions linux = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:web:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    authDomain: 'replace-me.firebaseapp.com',
-    storageBucket: 'replace-me.appspot.com',
+    apiKey: 'AIzaSyBAiHUsfEsdGvw4oHFfWTFCUJSOQIjUGtw',
+    appId: '1:1053228365631:web:d7b23f96026816b23d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    authDomain: 'tfgftp.firebaseapp.com',
+    storageBucket: 'tfgftp.firebasestorage.app',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REPLACE_ME',
-    appId: '1:000000000000:web:replace_me',
-    messagingSenderId: '000000000000',
-    projectId: 'replace-me',
-    authDomain: 'replace-me.firebaseapp.com',
-    storageBucket: 'replace-me.appspot.com',
+    apiKey: 'AIzaSyBAiHUsfEsdGvw4oHFfWTFCUJSOQIjUGtw',
+    appId: '1:1053228365631:web:05f0929856ed50c63d058a',
+    messagingSenderId: '1053228365631',
+    projectId: 'tfgftp',
+    authDomain: 'tfgftp.firebaseapp.com',
+    storageBucket: 'tfgftp.firebasestorage.app',
   );
 }
+
+

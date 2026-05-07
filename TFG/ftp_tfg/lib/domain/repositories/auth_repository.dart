@@ -13,5 +13,8 @@ abstract class AuthRepository {
     required String displayName,
   });
   Future<AppUser> signInWithGoogle();
+  Future<AppUser> linkEmailPassword(String password);
+  Future<AppUser> updateDisplayName(String displayName);
+  Future<void> sendPasswordResetEmail(String email);
   Future<void> signOut();
 }

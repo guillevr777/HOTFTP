@@ -9,15 +9,66 @@ class FileUtils {
     'tiff',
   };
 
+  static const videoExtensions = {
+    'mp4',
+    'mov',
+    'avi',
+    'mkv',
+    'webm',
+  };
+
+  static const documentExtensions = {
+    'pdf',
+    'doc',
+    'docx',
+    'txt',
+    'md',
+    'rtf',
+    'odt',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'xml',
+    'json',
+    'csv',
+  };
+
+  static const archiveExtensions = {
+    'zip',
+    'rar',
+    '7z',
+    'tar',
+    'gz',
+  };
+
+  static String extensionOf(String fileName) {
+    if (!fileName.contains('.')) return '';
+    return fileName.split('.').last.toLowerCase();
+  }
+
   static bool isImage(String fileName) {
-    if (!fileName.contains('.')) return false;
-    final ext = fileName.split('.').last.toLowerCase();
-    return imageExtensions.contains(ext);
+    return imageExtensions.contains(extensionOf(fileName));
   }
 
   static bool isVideo(String fileName) {
-    if (!fileName.contains('.')) return false;
-    final ext = fileName.split('.').last.toLowerCase();
-    return ext == 'mp4' || ext == 'mov' || ext == 'avi' || ext == 'mkv';
+    return videoExtensions.contains(extensionOf(fileName));
+  }
+
+  static bool isDocument(String fileName) {
+    return documentExtensions.contains(extensionOf(fileName));
+  }
+
+  static bool isArchive(String fileName) {
+    return archiveExtensions.contains(extensionOf(fileName));
+  }
+
+  static String fileCategory(String fileName, {bool isDirectory = false}) {
+    if (isDirectory) return 'Carpeta';
+    if (isImage(fileName)) return 'Imagen';
+    if (isVideo(fileName)) return 'Video';
+    if (isDocument(fileName)) return 'Documento';
+    if (isArchive(fileName)) return 'Archivo comprimido';
+    return 'Otro';
   }
 }

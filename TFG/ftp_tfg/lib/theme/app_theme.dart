@@ -8,6 +8,7 @@ class AppTheme {
   static const Color surfaceVariant = Color(0xFF21262D);
   static const Color onSurface = Color(0xFFE6EDF3);
   static const Color onSurfaceMuted = Color(0xFF8B949E);
+  static const Color warning = Color(0xFFF2C94C);
   static const Color error = Color(0xFFF85149);
   static const Color success = Color(0xFF3FB950);
 

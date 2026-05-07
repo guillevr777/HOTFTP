@@ -1,8 +1,11 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
+import '../../domain/entities/local_file.dart';
 import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
@@ -33,13 +36,60 @@ class FtpRepositoryImpl implements FtpRepository {
     String path,
     FtpProfile profile,
   ) async {
-    final data = await datasource.listRemoteFiles(path, _getConfig(profile));
-    return data.map(RemoteFileMapper.fromMap).toList();
+    final normalizedPath = _normalizeRemotePath(path);
+    final data = await datasource.listRemoteFiles(normalizedPath, _getConfig(profile));
+    return data
+        .map((map) => RemoteFileMapper.fromMap(map, normalizedPath))
+        .where((file) => !_isPseudoEntry(file, normalizedPath))
+        .toList();
   }
 
   @override
   Future<List<String>> getLocalFiles(String path) {
     return datasource.listLocalFiles(path);
+  }
+
+  String _normalizeRemotePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == "/") return "/";
+    final normalized = p.posix.normalize(trimmed.startsWith('/') ? trimmed : '/$trimmed');
+    return normalized == "." || normalized.isEmpty ? "/" : normalized;
+  }
+
+  bool _isPseudoEntry(RemoteFile file, String currentPath) {
+    final name = file.name.trim();
+    final normalizedCurrentPath = _normalizeRemotePath(currentPath);
+    final normalizedFilePath = _normalizeRemotePath(file.path);
+    final currentBase = normalizedCurrentPath == "/"
+        ? "/"
+        : p.posix.basename(normalizedCurrentPath);
+    return name.isEmpty ||
+        name == "/" ||
+        name == "." ||
+        name == ".." ||
+        name == normalizedCurrentPath ||
+        name == currentBase ||
+        normalizedFilePath == normalizedCurrentPath;
+  }
+
+  @override
+  Future<List<LocalFile>> getLocalFileDetails(String path) {
+    final dir = Directory(path);
+    if (!dir.existsSync()) return Future.value([]);
+    return Future.value(
+      dir.listSync().whereType<File>().map((file) {
+        final stat = file.statSync();
+        final fileName = file.uri.pathSegments.last;
+        return LocalFile(
+          name: fileName,
+          path: file.path,
+          size: stat.size,
+          isDirectory: false,
+          lastModified: stat.modified,
+          extension: p.extension(file.path).replaceFirst('.', '').toLowerCase(),
+        );
+      }).toList(),
+    );
   }
 
   @override
@@ -57,7 +107,33 @@ class FtpRepositoryImpl implements FtpRepository {
     String localPath,
     FtpProfile profile,
   ) {
-    return datasource.downloadFile(file.name, localPath, _getConfig(profile));
+    final remoteDirectory = p.dirname(file.path);
+    final targetPath = '$localPath/${file.name}';
+    return datasource.downloadFileToPath(
+      file.name,
+      remoteDirectory == '.' ? '/' : remoteDirectory,
+      targetPath,
+      _getConfig(profile),
+    );
+  }
+
+  @override
+  Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile) {
+    final directory = file.path == '/' ? '/' : p.dirname(file.path);
+    return datasource.deleteRemoteFile(
+      file.name,
+      directory == '.' ? '/' : directory,
+      _getConfig(profile),
+    );
+  }
+
+  @override
+  Future<void> deleteLocalFile(String path) {
+    final file = File(path);
+    if (file.existsSync()) {
+      return file.delete();
+    }
+    return Future.value();
   }
 
   @override
@@ -71,7 +147,8 @@ class FtpRepositoryImpl implements FtpRepository {
     if (!cacheDir.existsSync()) {
       cacheDir.createSync(recursive: true);
     }
-    final localPath = '${cacheDir.path}/${profile.id}_${file.name}';
+    final safeName = file.path.replaceAll('/', '_').replaceAll(':', '_');
+    final localPath = '${cacheDir.path}/${profile.id}_$safeName';
     final localFile = File(localPath);
 
     if (localFile.existsSync()) {
@@ -98,7 +175,19 @@ class FtpRepositoryImpl implements FtpRepository {
       remotePath,
       _getConfig(profile),
     );
-    final remoteNames = remote.map((e) => e['name']).toSet();
+    final currentBase = _normalizeRemotePath(remotePath) == "/"
+        ? "/"
+        : p.posix.basename(_normalizeRemotePath(remotePath));
+    final remoteNames = remote
+        .map((e) => (e['name'] as String? ?? '').trim())
+        .where((name) =>
+            name.isNotEmpty &&
+            name != '/' &&
+            name != '.' &&
+            name != '..' &&
+            name != _normalizeRemotePath(remotePath) &&
+            name != currentBase)
+        .toSet();
     return local
         .where(remoteNames.contains)
         .map(
@@ -137,4 +226,25 @@ class FtpRepositoryImpl implements FtpRepository {
   @override
   Future<void> saveSyncRecord(SyncRecord record) =>
       _db.insertSyncRecord(record);
+
+  @override
+  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) =>
+      _db.getDumpSchedules(ownerId);
+
+  @override
+  Future<DumpSchedule?> getDumpScheduleForProfile(
+    String ownerId,
+    int profileId,
+  ) =>
+      _db.getDumpScheduleForProfile(ownerId, profileId);
+
+  @override
+  Future<int> saveDumpSchedule(DumpSchedule schedule) =>
+      _db.saveDumpSchedule(schedule);
+
+  @override
+  Future<void> deleteDumpSchedule(int id, String ownerId) =>
+      _db.deleteDumpSchedule(id, ownerId);
 }
+
+

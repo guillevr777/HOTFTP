@@ -2,14 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
+import '../../../domain/repositories/ftp_repository.dart';
+import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/profile_viewmodel.dart';
+import '../auth/account_screen.dart';
 import '../browser/remote_browser_screen.dart';
+import '../monitoring/health_center_screen.dart';
 import 'profile_form_screen.dart';
 
 class ProfileListScreen extends StatefulWidget {
-  const ProfileListScreen({super.key});
+  final FtpRepository ftpRepository;
+  final MonitoringRepository monitoringRepository;
+  final String ownerId;
+
+  const ProfileListScreen({
+    super.key,
+    required this.ftpRepository,
+    required this.monitoringRepository,
+    required this.ownerId,
+  });
 
   @override
   State<ProfileListScreen> createState() => _ProfileListScreenState();
@@ -52,6 +65,28 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Mi cuenta',
+            icon: const Icon(Icons.account_circle_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AccountScreen()),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Centro de salud',
+            icon: const Icon(Icons.health_and_safety_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HealthCenterScreen(
+                  repository: widget.monitoringRepository,
+                  ftpRepository: widget.ftpRepository,
+                  ownerId: widget.ownerId,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
             tooltip: 'Cerrar sesión',
             icon: const Icon(Icons.logout),
             onPressed: authVm.isLoading
@@ -65,8 +100,8 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
       body: profileVm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : profileVm.profiles.isEmpty
-              ? _buildEmptyState(context)
-              : _buildProfileList(context, profileVm),
+          ? _buildEmptyState(context)
+          : _buildProfileList(context, profileVm),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(context, null),
         icon: const Icon(Icons.add),
@@ -123,7 +158,12 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
     final vm = context.read<ProfileViewModel>();
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ProfileFormScreen(profile: profile)),
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider.value(
+          value: vm,
+          child: ProfileFormScreen(profile: profile),
+        ),
+      ),
     );
     if (mounted) {
       await vm.loadProfiles();
@@ -133,7 +173,14 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
   void _connect(BuildContext context, FtpProfile profile) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => RemoteBrowserScreen(profile: profile)),
+      MaterialPageRoute(
+        builder: (_) => RemoteBrowserScreen(
+          profile: profile,
+          repository: widget.ftpRepository,
+          ownerId: widget.ownerId,
+          monitoringRepository: widget.monitoringRepository,
+        ),
+      ),
     );
   }
 

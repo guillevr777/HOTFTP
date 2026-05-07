@@ -7,11 +7,32 @@ class FakeFtpDatasource implements FtpDatasource {
     Map<String, dynamic> config,
   ) async {
     await Future.delayed(const Duration(milliseconds: 500));
+    final now = DateTime.now();
     return [
-      {"name": "Documentos", "size": 0, "isDir": true},
-      {"name": "Imagenes", "size": 0, "isDir": true},
-      {"name": "notas.txt", "size": 1204, "isDir": false},
-      {"name": "configuración.xml", "size": 450, "isDir": false},
+      {
+        "name": "Documentos",
+        "size": 0,
+        "isDir": true,
+        "modifyTime": now.subtract(const Duration(days: 1)).toIso8601String(),
+      },
+      {
+        "name": "Imagenes",
+        "size": 0,
+        "isDir": true,
+        "modifyTime": now.subtract(const Duration(days: 2)).toIso8601String(),
+      },
+      {
+        "name": "notas.txt",
+        "size": 1204,
+        "isDir": false,
+        "modifyTime": now.subtract(const Duration(hours: 3)).toIso8601String(),
+      },
+      {
+        "name": "configuración.xml",
+        "size": 450,
+        "isDir": false,
+        "modifyTime": now.subtract(const Duration(days: 5)).toIso8601String(),
+      },
     ];
   }
 
@@ -46,6 +67,15 @@ class FakeFtpDatasource implements FtpDatasource {
     Map<String, dynamic> config,
   ) async {
     await Future.delayed(const Duration(seconds: 1));
+  }
+
+  @override
+  Future<void> deleteRemoteFile(
+    String remoteFileName,
+    String remoteDirectory,
+    Map<String, dynamic> config,
+  ) async {
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   @override

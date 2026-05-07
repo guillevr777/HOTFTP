@@ -17,26 +17,33 @@ class FirebaseAuthRepositoryImpl implements AuthRepository {
   Future<AppUser> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) =>
-      datasource.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  }) => datasource.signInWithEmailAndPassword(email: email, password: password);
 
   @override
   Future<AppUser> registerWithEmailAndPassword({
     required String email,
     required String password,
     required String displayName,
-  }) =>
-      datasource.registerWithEmailAndPassword(
-        email: email,
-        password: password,
-        displayName: displayName,
-      );
+  }) => datasource.registerWithEmailAndPassword(
+    email: email,
+    password: password,
+    displayName: displayName,
+  );
 
   @override
   Future<AppUser> signInWithGoogle() => datasource.signInWithGoogle();
+
+  @override
+  Future<AppUser> linkEmailPassword(String password) =>
+      datasource.linkEmailPassword(password);
+
+  @override
+  Future<AppUser> updateDisplayName(String displayName) =>
+      datasource.updateDisplayName(displayName);
+
+  @override
+  Future<void> sendPasswordResetEmail(String email) =>
+      datasource.sendPasswordResetEmail(email);
 
   @override
   Future<void> signOut() => datasource.signOut();

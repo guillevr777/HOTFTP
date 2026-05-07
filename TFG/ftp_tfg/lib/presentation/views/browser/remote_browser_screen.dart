@@ -1,35 +1,64 @@
-﻿import 'dart:io';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
+import '../../../domain/repositories/ftp_repository.dart';
+import '../../../domain/repositories/monitoring_repository.dart';
+import '../../../theme/app_theme.dart';
 import '../../../utils/file_utils.dart';
 import '../../viewmodels/browser_viewmodel.dart';
-import '../../viewmodels/profile_viewmodel.dart';
-import '../../../theme/app_theme.dart';
-import '../sync/sync_screen.dart';
 import '../history/history_screen.dart';
+import '../sync/sync_screen.dart';
 
 class RemoteBrowserScreen extends StatelessWidget {
   final FtpProfile profile;
-  const RemoteBrowserScreen({super.key, required this.profile});
+  final FtpRepository repository;
+  final MonitoringRepository monitoringRepository;
+  final String ownerId;
+
+  const RemoteBrowserScreen({
+    super.key,
+    required this.profile,
+    required this.repository,
+    required this.monitoringRepository,
+    required this.ownerId,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => BrowserViewModel(
-        repository: context.read<ProfileViewModel>().repository,
+        repository: repository,
+        monitoringRepository: monitoringRepository,
         profile: profile,
+        ownerId: ownerId,
       )..loadRemoteFiles(),
-      child: _RemoteBrowserBody(profile: profile),
+      child: _RemoteBrowserBody(
+        profile: profile,
+        repository: repository,
+        monitoringRepository: monitoringRepository,
+        ownerId: ownerId,
+      ),
     );
   }
 }
 
 class _RemoteBrowserBody extends StatelessWidget {
   final FtpProfile profile;
-  const _RemoteBrowserBody({required this.profile});
+  final FtpRepository repository;
+  final MonitoringRepository monitoringRepository;
+  final String ownerId;
+
+  const _RemoteBrowserBody({
+    required this.profile,
+    required this.repository,
+    required this.monitoringRepository,
+    required this.ownerId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +85,14 @@ class _RemoteBrowserBody extends StatelessWidget {
             tooltip: 'Sincronizar',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => SyncScreen(profile: profile)),
+              MaterialPageRoute(
+                builder: (_) => SyncScreen(
+                  profile: profile,
+                  repository: repository,
+                  monitoringRepository: monitoringRepository,
+                  ownerId: ownerId,
+                ),
+              ),
             ),
           ),
           IconButton(
@@ -65,7 +101,12 @@ class _RemoteBrowserBody extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HistoryScreen(profile: profile),
+                builder: (_) => HistoryScreen(
+                  profile: profile,
+                  repository: repository,
+                  monitoringRepository: monitoringRepository,
+                  ownerId: ownerId,
+                ),
               ),
             ),
           ),
@@ -97,6 +138,7 @@ class _RemoteBrowserBody extends StatelessWidget {
             ),
           if (vm.currentRemotePath != '/')
             _PathBar(path: vm.currentRemotePath, onGoUp: vm.goUpRemote),
+          _FilterBar(vm: vm),
           if (vm.isTransferring)
             LinearProgressIndicator(
               value: vm.downloadProgress > 0 ? vm.downloadProgress : null,
@@ -116,10 +158,10 @@ class _RemoteBrowserBody extends StatelessWidget {
           Expanded(
             child: vm.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : vm.remoteFiles.isEmpty
+                : vm.visibleRemoteFiles.isEmpty
                 ? const Center(
                     child: Text(
-                      'Carpeta vacia',
+                      'No hay resultados con los filtros actuales',
                       style: TextStyle(color: AppTheme.onSurfaceMuted),
                     ),
                   )
@@ -127,16 +169,16 @@ class _RemoteBrowserBody extends StatelessWidget {
                     onRefresh: () => vm.loadRemoteFiles(),
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: vm.remoteFiles.length,
+                      itemCount: vm.visibleRemoteFiles.length,
                       separatorBuilder: (context, index) =>
                           const Divider(height: 1, indent: 56),
                       itemBuilder: (context, i) {
-                        final file = vm.remoteFiles[i];
+                        final file = vm.visibleRemoteFiles[i];
                         return _FileListTile(
                           file: file,
-                          onTap: () {
+                          onTap: () async {
                             if (file.isDirectory) {
-                              vm.navigateRemote(file.name);
+                              await vm.navigateRemote(file);
                             }
                           },
                           onDownload: file.isDirectory
@@ -167,6 +209,122 @@ class _RemoteBrowserBody extends StatelessWidget {
               : vm.error!,
         ),
         backgroundColor: vm.error == null ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+}
+
+class _FilterBar extends StatelessWidget {
+  final BrowserViewModel vm;
+  const _FilterBar({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFF30363D), width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            onChanged: vm.setSearchQuery,
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: AppTheme.surfaceVariant,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: RemoteTypeFilter.values.map((filter) {
+              final selected = vm.typeFilter == filter;
+              final label = switch (filter) {
+                RemoteTypeFilter.all => 'Todo',
+                RemoteTypeFilter.folders => 'Carpetas',
+                RemoteTypeFilter.images => 'Fotos',
+                RemoteTypeFilter.videos => 'Vídeos',
+                RemoteTypeFilter.documents => 'Documentos',
+                RemoteTypeFilter.archives => 'Comprimidos',
+                RemoteTypeFilter.others => 'Otros',
+              };
+              return FilterChip(
+                selected: selected,
+                label: Text(label),
+                onSelected: (_) => vm.setTypeFilter(filter),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<RemoteSortField>(
+                  initialValue: vm.sortField,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Ordenar por',
+                    filled: true,
+                    fillColor: AppTheme.surfaceVariant,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: RemoteSortField.name,
+                      child: Text('Nombre'),
+                    ),
+                    DropdownMenuItem(
+                      value: RemoteSortField.date,
+                      child: Text('Fecha'),
+                    ),
+                    DropdownMenuItem(
+                      value: RemoteSortField.size,
+                      child: Text('Tamaño'),
+                    ),
+                    DropdownMenuItem(
+                      value: RemoteSortField.type,
+                      child: Text('Tipo'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) vm.setSortField(value);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton.filledTonal(
+                onPressed: vm.toggleSortDirection,
+                icon: Icon(
+                  vm.sortDirection == SortDirection.asc
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
+                ),
+                tooltip: vm.sortDirection == SortDirection.asc
+                    ? 'Ascendente'
+                    : 'Descendente',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${vm.visibleRemoteFiles.length} archivos visibles',
+            style: const TextStyle(
+              color: AppTheme.onSurfaceMuted,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -228,7 +386,7 @@ class _FileListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BrowserViewModel>();
-    final thumbnailPath = vm.thumbnails[file.name];
+    final thumbnailPath = vm.thumbnails[file.path];
 
     Widget leading;
     if (thumbnailPath != null) {
@@ -250,8 +408,12 @@ class _FileListTile extends StatelessWidget {
       leading: SizedBox(width: 40, height: 40, child: Center(child: leading)),
       title: Text(file.name),
       subtitle: file.isDirectory
-          ? null
-          : Text(_formatSize(file.size), style: const TextStyle(fontSize: 12)),
+          ? const Text('Carpeta')
+          : Text(
+              '${_formatSize(file.size)} • ${FileUtils.fileCategory(file.name)}'
+              '${file.modifiedAt != null ? ' • ${vm.formatModifiedAt(file)}' : ''}',
+              style: const TextStyle(fontSize: 12),
+            ),
       trailing: onDownload != null
           ? IconButton(
               icon: const Icon(
@@ -275,7 +437,10 @@ class _FileListTile extends StatelessWidget {
       iconColor = const Color(0xFFE3B341);
     } else if (FileUtils.isVideo(file.name)) {
       iconData = Icons.videocam_outlined;
-      iconColor = AppTheme.primary; // O un color que prefieras para vídeos
+      iconColor = AppTheme.primary;
+    } else if (FileUtils.isImage(file.name)) {
+      iconData = Icons.image_outlined;
+      iconColor = AppTheme.success;
     }
 
     return Icon(iconData, color: iconColor, size: 28);

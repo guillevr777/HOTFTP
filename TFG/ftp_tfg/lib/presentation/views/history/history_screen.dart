@@ -3,22 +3,33 @@ import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/sync_record.dart';
+import '../../../domain/repositories/ftp_repository.dart';
+import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/profile_viewmodel.dart';
 import '../../viewmodels/sync_viewmodel.dart';
 
 class HistoryScreen extends StatelessWidget {
   final FtpProfile profile;
-  const HistoryScreen({super.key, required this.profile});
+  final FtpRepository repository;
+  final MonitoringRepository monitoringRepository;
+  final String ownerId;
+
+  const HistoryScreen({
+    super.key,
+    required this.profile,
+    required this.repository,
+    required this.monitoringRepository,
+    required this.ownerId,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => SyncViewModel(
-        repository: context.read<ProfileViewModel>().repository,
+        repository: repository,
+        monitoringRepository: monitoringRepository,
         profile: profile,
-        ownerId: context.read<AuthViewModel>().currentUser?.uid ?? '',
+        ownerId: ownerId,
       )..loadHistory(),
       child: const _HistoryBody(),
     );

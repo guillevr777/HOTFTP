@@ -1,24 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../domain/entities/dump_schedule.dart';
 import '../../../domain/entities/ftp_profile.dart';
+import '../../../domain/repositories/ftp_repository.dart';
+import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/profile_viewmodel.dart';
+import '../../viewmodels/dump_schedule_viewmodel.dart';
 import '../../viewmodels/sync_viewmodel.dart';
 
 class SyncScreen extends StatelessWidget {
   final FtpProfile profile;
-  const SyncScreen({super.key, required this.profile});
+  final FtpRepository repository;
+  final MonitoringRepository monitoringRepository;
+  final String ownerId;
+
+  const SyncScreen({
+    super.key,
+    required this.profile,
+    required this.repository,
+    required this.monitoringRepository,
+    required this.ownerId,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => SyncViewModel(
-        repository: context.read<ProfileViewModel>().repository,
-        profile: profile,
-        ownerId: context.read<AuthViewModel>().currentUser?.uid ?? '',
-      ),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => SyncViewModel(
+            repository: repository,
+            monitoringRepository: monitoringRepository,
+            profile: profile,
+            ownerId: ownerId,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DumpScheduleViewModel(
+            repository: repository,
+            profile: profile,
+            ownerId: ownerId,
+          )..loadSchedule(),
+        ),
+      ],
       child: _SyncBody(profile: profile),
     );
   }
@@ -31,6 +55,7 @@ class _SyncBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<SyncViewModel>();
+    final scheduleVm = context.watch<DumpScheduleViewModel>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sincronizacion')),
@@ -83,7 +108,7 @@ class _SyncBody extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const Text(
-              'RUTAS',
+              'RUTAS MANUALES',
               style: TextStyle(
                 color: AppTheme.primary,
                 fontSize: 11,
@@ -96,17 +121,26 @@ class _SyncBody extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _PathRow(
-                      label: 'Local',
-                      path: vm.localPath,
-                      icon: Icons.phone_android,
+                    TextFormField(
+                      initialValue: vm.localPath,
+                      onChanged: vm.setLocalPath,
+                      decoration: const InputDecoration(
+                        labelText: 'Ruta local',
+                        hintText: '/storage/emulated/0/DCIM/Camera',
+                        prefixIcon: Icon(Icons.phone_android),
+                      ),
                     ),
-                    const Divider(height: 24),
-                    _PathRow(
-                      label: 'Remota',
-                      path: vm.remotePath,
-                      icon: Icons.cloud_outlined,
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: vm.remotePath,
+                      onChanged: vm.setRemotePath,
+                      decoration: const InputDecoration(
+                        labelText: 'Ruta remota',
+                        hintText: '/',
+                        prefixIcon: Icon(Icons.cloud_outlined),
+                      ),
                     ),
                   ],
                 ),
@@ -231,6 +265,24 @@ class _SyncBody extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
+            const SizedBox(height: 28),
+            const Text(
+              'VOLUMEN RECURRENTE',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (scheduleVm.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              const _ScheduleEditor(),
           ],
         ),
       ),
@@ -309,36 +361,230 @@ class _ModeSelector extends StatelessWidget {
   }
 }
 
-class _PathRow extends StatelessWidget {
-  final String label;
-  final String path;
-  final IconData icon;
-  const _PathRow({
-    required this.label,
-    required this.path,
-    required this.icon,
-  });
+
+class _ScheduleEditor extends StatefulWidget {
+  const _ScheduleEditor();
+
+  @override
+  State<_ScheduleEditor> createState() => _ScheduleEditorState();
+}
+
+class _ScheduleEditorState extends State<_ScheduleEditor> {
+  final TextEditingController _localController = TextEditingController();
+  final TextEditingController _remoteController = TextEditingController();
+  final TextEditingController _intervalController = TextEditingController();
+  DumpScheduleViewModel? _vm;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final vm = context.read<DumpScheduleViewModel>();
+    if (_vm != vm) {
+      _vm?.removeListener(_syncControllers);
+      _vm = vm;
+      _vm!.addListener(_syncControllers);
+      _syncControllers();
+    }
+  }
+
+  void _syncControllers() {
+    final vm = context.read<DumpScheduleViewModel>();
+    if (_localController.text != vm.localPath) {
+      _localController.text = vm.localPath;
+    }
+    if (_remoteController.text != vm.remotePath) {
+      _remoteController.text = vm.remotePath;
+    }
+    final intervalText = vm.intervalValue.toString();
+    if (_intervalController.text != intervalText) {
+      _intervalController.text = intervalText;
+    }
+  }
+
+  @override
+  void dispose() {
+    _vm?.removeListener(_syncControllers);
+    _localController.dispose();
+    _remoteController.dispose();
+    _intervalController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppTheme.onSurfaceMuted, size: 20),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final scheduleVm = context.watch<DumpScheduleViewModel>();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.onSurfaceMuted,
-                fontSize: 12,
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: scheduleVm.enabled,
+              onChanged: scheduleVm.setEnabled,
+              title: const Text('Activar volcado recurrente'),
+              subtitle: const Text(
+                'Se ejecuta de forma periódica mientras la app esté activa.',
               ),
             ),
-            Text(path, style: const TextStyle(fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _localController,
+              onChanged: scheduleVm.setLocalPath,
+              decoration: const InputDecoration(
+                labelText: 'Ruta local de origen/destino',
+                hintText: '/storage/emulated/0/Download',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _remoteController,
+              onChanged: scheduleVm.setRemotePath,
+              decoration: const InputDecoration(
+                labelText: 'Ruta remota de origen/destino',
+                hintText: '/',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<DumpTransferMode>(
+              initialValue: scheduleVm.transferMode,
+              decoration: const InputDecoration(
+                labelText: 'Tipo de volcado',
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: DumpTransferMode.oneWay,
+                  child: Text('De un sitio a otro'),
+                ),
+                DropdownMenuItem(
+                  value: DumpTransferMode.syncBoth,
+                  child: Text('Sincronizar ambos lados'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) scheduleVm.setTransferMode(value);
+              },
+            ),
+            const SizedBox(height: 12),
+            if (scheduleVm.transferMode == DumpTransferMode.oneWay) ...[
+              DropdownButtonFormField<DumpSourceSide>(
+                initialValue: scheduleVm.sourceSide,
+                decoration: const InputDecoration(
+                  labelText: 'Origen',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: DumpSourceSide.local,
+                    child: Text('Local'),
+                  ),
+                  DropdownMenuItem(
+                    value: DumpSourceSide.remote,
+                    child: Text('Remoto'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) scheduleVm.setSourceSide(value);
+                },
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: scheduleVm.deleteSourceAfterCopy,
+                onChanged: scheduleVm.setDeleteSourceAfterCopy,
+                title: const Text('Eliminar del origen tras copiar'),
+                subtitle: const Text(
+                  'Si se desactiva, el origen se conserva.',
+                ),
+              ),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _intervalController,
+                    keyboardType: TextInputType.number,
+                    onChanged: scheduleVm.setIntervalValue,
+                    decoration: const InputDecoration(
+                      labelText: 'Cada',
+                      helperText: 'Número de horas o días',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<DumpIntervalUnit>(
+                    initialValue: scheduleVm.intervalUnit,
+                    decoration: const InputDecoration(
+                      labelText: 'Unidad',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: DumpIntervalUnit.hours,
+                        child: Text('Horas'),
+                      ),
+                      DropdownMenuItem(
+                        value: DumpIntervalUnit.days,
+                        child: Text('Días'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) scheduleVm.setIntervalUnit(value);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (scheduleVm.schedule?.nextRunAt != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Próxima ejecución: ${scheduleVm.schedule!.nextRunAt}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.onSurfaceMuted,
+                ),
+              ),
+            ],
+            if (scheduleVm.error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                scheduleVm.error!,
+                style: const TextStyle(color: AppTheme.error),
+              ),
+            ],
+            if (scheduleVm.successMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                scheduleVm.successMessage!,
+                style: const TextStyle(color: AppTheme.success),
+              ),
+            ],
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: scheduleVm.isSaving
+                  ? null
+                  : () => scheduleVm.saveSchedule(),
+              icon: scheduleVm.isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Icon(Icons.schedule),
+              label: Text(
+                scheduleVm.isSaving
+                    ? 'Guardando...'
+                    : 'Guardar volcado recurrente',
+              ),
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
+
+

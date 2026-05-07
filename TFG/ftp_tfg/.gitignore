@@ -1,6 +1,9 @@
 # Miscellaneous
 *.class
 *.log
+*.err
+android/*.log
+android/*.err
 *.pyc
 *.swp
 .DS_Store
@@ -28,10 +31,17 @@ migrate_working_dir/
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
+.gradle-home/
+android/.gradle-fresh/
 .pub-cache/
 .pub/
 /build/
 /coverage/
+
+# Temporary notes and extracted artefacts
+ui*.xml
+_pdf_extract_utf8.txt
+google_flow.png
 
 # Symbolication related
 app.*.symbols

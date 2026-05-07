@@ -101,6 +101,7 @@ class FtpRealDatasource implements FtpDatasource {
               "name": e.name,
               "size": e.size ?? 0,
               "isDir": e.type == FTPEntryType.dir,
+              "modifyTime": e.modifyTime?.toIso8601String(),
             },
           )
           .toList();
@@ -183,6 +184,27 @@ class FtpRealDatasource implements FtpDatasource {
     } catch (e) {
       debugPrint(
         "HOTFTP: Error downloading file $remoteFileName from $remoteDirectory to $targetLocalPath: $e",
+      );
+      await ftp.disconnect();
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteRemoteFile(
+    String remoteFileName,
+    String remoteDirectory,
+    Map<String, dynamic> config,
+  ) async {
+    final ftp = _createClient(config);
+    try {
+      await ftp.connect();
+      await ftp.changeDirectory(remoteDirectory);
+      await ftp.deleteFile(remoteFileName);
+      await ftp.disconnect();
+    } catch (e) {
+      debugPrint(
+        "HOTFTP: Error deleting remote file $remoteFileName from $remoteDirectory: $e",
       );
       await ftp.disconnect();
       rethrow;

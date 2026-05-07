@@ -51,6 +51,51 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _forgotPassword(AuthViewModel vm) async {
+    final email = _emailController.text.trim();
+    final confirmedEmail = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final dialogController = TextEditingController(text: email);
+        return AlertDialog(
+          title: const Text('Recuperar contraseña'),
+          content: TextField(
+            controller: dialogController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Correo electrónico',
+              hintText: 'usuario@dominio.com',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, dialogController.text.trim()),
+              child: const Text('Enviar enlace'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || confirmedEmail == null || confirmedEmail.isEmpty) return;
+    final ok = await vm.sendPasswordResetEmail(confirmedEmail);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Te hemos enviado un correo para restablecer la contraseña.'
+              : vm.error ?? 'No se pudo enviar el correo de recuperación',
+        ),
+        backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AuthViewModel>();
@@ -78,12 +123,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Icon(Icons.cloud_sync, size: 56, color: AppTheme.primary),
+                          const Icon(
+                            Icons.cloud_sync,
+                            size: 56,
+                            color: AppTheme.primary,
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'HOTFTP',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           const Text(
@@ -118,10 +170,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
                                 ),
-                                onPressed: () =>
-                                    setState(() => _obscurePassword = !_obscurePassword),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
                               ),
                             ),
                             validator: (value) => value == null || value.isEmpty
@@ -135,19 +190,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Icon(Icons.login),
-                            label: Text(vm.isLoading ? 'Entrando...' : 'Iniciar sesión'),
+                            label: Text(
+                              vm.isLoading ? 'Entrando...' : 'Iniciar sesión',
+                            ),
                           ),
                           const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: vm.isLoading
+                                  ? null
+                                  : () => _forgotPassword(vm),
+                              child: const Text('¿Has olvidado tu contraseña?'),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
                           OutlinedButton.icon(
-                            onPressed: vm.isLoading ? null : () => _loginWithGoogle(vm),
+                            onPressed: vm.isLoading
+                                ? null
+                                : () => _loginWithGoogle(vm),
                             icon: const Icon(Icons.g_mobiledata, size: 26),
                             label: const Text('Continuar con Google'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.onSurface,
-                              side: const BorderSide(color: AppTheme.surfaceVariant),
+                              side: const BorderSide(
+                                color: AppTheme.surfaceVariant,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),

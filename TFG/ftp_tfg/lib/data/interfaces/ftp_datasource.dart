@@ -14,6 +14,11 @@
     String localPath,
     Map<String, dynamic> config,
   );
+  Future<void> deleteRemoteFile(
+    String remoteFileName,
+    String remoteDirectory,
+    Map<String, dynamic> config,
+  );
   Future<void> downloadFileToPath(
     String remoteFileName,
     String remoteDirectory,
