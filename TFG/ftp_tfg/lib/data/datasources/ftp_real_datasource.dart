@@ -1,6 +1,7 @@
-﻿import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:ftpconnect/ftpconnect.dart';
+import 'package:universal_io/io.dart';
+
 import '../interfaces/ftp_datasource.dart';
 
 class FtpRealDatasource implements FtpDatasource {
@@ -14,7 +15,9 @@ class FtpRealDatasource implements FtpDatasource {
     final passive = config['passiveMode'] ?? true;
 
     // Fix connection from Android Emulator to Host Localhost
-    if (Platform.isAndroid && (host == '127.0.0.1' || host == 'localhost')) {
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        (host == '127.0.0.1' || host == 'localhost')) {
       debugPrint("HOTFTP: Remapping $host to 10.0.2.2 for Android Emulator");
       host = '10.0.2.2';
     }
@@ -116,6 +119,7 @@ class FtpRealDatasource implements FtpDatasource {
 
   @override
   Future<List<String>> listLocalFiles(String path) async {
+    if (kIsWeb) return [];
     final dir = Directory(path);
     if (!dir.existsSync()) return [];
     return dir

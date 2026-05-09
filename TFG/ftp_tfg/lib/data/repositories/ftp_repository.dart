@@ -1,7 +1,7 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:universal_io/io.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -74,6 +74,7 @@ class FtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<List<LocalFile>> getLocalFileDetails(String path) {
+    if (kIsWeb) return Future.value([]);
     final dir = Directory(path);
     if (!dir.existsSync()) return Future.value([]);
     return Future.value(
@@ -129,6 +130,7 @@ class FtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<void> deleteLocalFile(String path) {
+    if (kIsWeb) return Future.value();
     final file = File(path);
     if (file.existsSync()) {
       return file.delete();
@@ -142,6 +144,7 @@ class FtpRepositoryImpl implements FtpRepository {
     String remotePath,
     FtpProfile profile,
   ) async {
+    if (kIsWeb) return '';
     final tempDir = await getTemporaryDirectory();
     final cacheDir = Directory('${tempDir.path}/thumbnails');
     if (!cacheDir.existsSync()) {

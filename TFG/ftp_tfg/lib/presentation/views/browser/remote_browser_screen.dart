@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:universal_io/io.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
@@ -389,7 +388,7 @@ class _FileListTile extends StatelessWidget {
     final thumbnailPath = vm.thumbnails[file.path];
 
     Widget leading;
-    if (thumbnailPath != null) {
+    if (!kIsWeb && thumbnailPath != null) {
       leading = ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: Image.file(

@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:universal_io/io.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/file_version.dart';
@@ -651,6 +650,7 @@ class DatabaseHelper {
 
   // ---- Local Files ----
   Future<List<LocalFile>> getLocalFileDetails(String path) async {
+    if (kIsWeb) return [];
     final dir = Directory(path);
     if (!dir.existsSync()) return [];
     return dir.listSync().whereType<File>().map((file) {

@@ -107,8 +107,7 @@ class SystemHealthViewModel extends ChangeNotifier {
         usageStats: usageStats,
         generatedAt: DateTime.now(),
       );
-      final file = await _exportService.export(content);
-      lastExportPath = file.path;
+      lastExportPath = await _exportService.export(content);
       return true;
     } catch (e) {
       error = 'No se pudo generar el informe: $e';
