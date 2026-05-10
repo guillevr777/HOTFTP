@@ -30,8 +30,7 @@ class SystemHealthViewModel extends ChangeNotifier {
   final IAcknowledgeAlertUseCase _acknowledgeAlert;
   final String ownerId;
   final IBuildSystemHealthReportUseCase _buildSystemHealthReport;
-  final HealthReportExportService _exportService =
-      const HealthReportExportService();
+  final HealthReportExportService _exportService;
   final IGenerateSystemRecommendationsUseCase _generateRecommendations;
   final IAnalyzeSystemUsageUseCase _analyzeSystemUsage;
 
@@ -45,6 +44,7 @@ class SystemHealthViewModel extends ChangeNotifier {
     required IAcknowledgeAlertUseCase acknowledgeAlert,
     required this.ownerId,
     required IBuildSystemHealthReportUseCase buildSystemHealthReport,
+    required HealthReportExportService exportService,
     required IGenerateSystemRecommendationsUseCase generateSystemRecommendations,
     required IAnalyzeSystemUsageUseCase analyzeSystemUsage,
   })  : _getHealthSummary = getHealthSummary,
@@ -55,6 +55,7 @@ class SystemHealthViewModel extends ChangeNotifier {
         _getProfiles = getProfiles,
         _acknowledgeAlert = acknowledgeAlert,
         _buildSystemHealthReport = buildSystemHealthReport,
+        _exportService = exportService,
         _generateRecommendations = generateSystemRecommendations,
         _analyzeSystemUsage = analyzeSystemUsage;
 

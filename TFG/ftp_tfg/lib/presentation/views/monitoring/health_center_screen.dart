@@ -7,6 +7,7 @@ import '../../../domain/entities/system_event.dart';
 import '../../../domain/entities/system_health_summary.dart';
 import '../../../domain/entities/system_recommendation.dart';
 import '../../../domain/entities/system_usage_stats.dart';
+import '../../../core/services/health_report_export_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../viewmodels/system_health_view_model.dart';
 import 'file_version_history_screen.dart';
@@ -43,6 +44,7 @@ class HealthCenterScreen extends StatelessWidget {
         ownerId: ownerId,
         buildSystemHealthReport:
             context.read<IBuildSystemHealthReportUseCase>(),
+        exportService: context.read<HealthReportExportService>(),
         generateSystemRecommendations:
             context.read<IGenerateSystemRecommendationsUseCase>(),
         analyzeSystemUsage: context.read<IAnalyzeSystemUsageUseCase>(),
