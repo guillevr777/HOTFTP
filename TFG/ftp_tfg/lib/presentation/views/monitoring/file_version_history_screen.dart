@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/file_version.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/file_version_history_viewmodel.dart';
+import '../../viewmodels/file_version_history_view_model.dart';
+import '../../../domain/interfaces/i_get_file_version_history_use_case.dart';
 
 class FileVersionHistoryScreen extends StatelessWidget {
-  final MonitoringRepository repository;
   final String ownerId;
   final int profileId;
   final String filePath;
@@ -15,7 +14,6 @@ class FileVersionHistoryScreen extends StatelessWidget {
 
   const FileVersionHistoryScreen({
     super.key,
-    required this.repository,
     required this.ownerId,
     required this.profileId,
     required this.filePath,
@@ -25,8 +23,8 @@ class FileVersionHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => FileVersionHistoryViewModel(
-        repository: repository,
+      create: (context) => FileVersionHistoryViewModel(
+        getFileVersionHistory: context.read<IGetFileVersionHistoryUseCase>(),
         ownerId: ownerId,
         profileId: profileId,
         filePath: filePath,
@@ -133,7 +131,7 @@ class _VersionDetailCard extends StatelessWidget {
                 const Icon(Icons.restore_rounded, color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Versión ${version.versionNumber}',
+                  'VersiÃ³n ${version.versionNumber}',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],
@@ -145,7 +143,7 @@ class _VersionDetailCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Tamaño: ${version.size} bytes',
+              'TamaÃ±o: ${version.size} bytes',
               style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceMuted),
             ),
             const SizedBox(height: 4),
@@ -180,3 +178,7 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+
+
+

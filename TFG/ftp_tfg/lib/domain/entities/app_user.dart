@@ -1,4 +1,4 @@
-class AppUser {
+﻿class AppUser {
   final String uid;
   final String email;
   final String displayName;
@@ -13,3 +13,4 @@ class AppUser {
     this.providers = const [],
   });
 }
+

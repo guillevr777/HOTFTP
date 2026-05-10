@@ -1,4 +1,4 @@
-class FileVersion {
+﻿class FileVersion {
   final int? id;
   final String ownerId;
   final int profileId;
@@ -53,3 +53,4 @@ class FileVersion {
         DateTime.fromMillisecondsSinceEpoch(0),
   );
 }
+

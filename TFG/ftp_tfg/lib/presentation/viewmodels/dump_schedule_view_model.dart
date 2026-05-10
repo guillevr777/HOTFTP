@@ -1,16 +1,19 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
-import '../../domain/repositories/ftp_repository.dart';
+import '../../domain/interfaces/i_get_dump_schedule_for_profile_use_case.dart';
+import '../../domain/interfaces/i_save_dump_schedule_use_case.dart';
 
 class DumpScheduleViewModel extends ChangeNotifier {
-  final FtpRepository repository;
+  final IGetDumpScheduleForProfileUseCase getDumpScheduleForProfile;
+  final ISaveDumpScheduleUseCase saveDumpSchedule;
   final FtpProfile profile;
   final String ownerId;
 
   DumpScheduleViewModel({
-    required this.repository,
+    required this.getDumpScheduleForProfile,
+    required this.saveDumpSchedule,
     required this.profile,
     required this.ownerId,
   });
@@ -36,10 +39,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      schedule = await repository.getDumpScheduleForProfile(
-        ownerId,
-        profile.id!,
-      );
+      schedule = await getDumpScheduleForProfile.execute(ownerId, profile.id!);
       if (schedule != null) {
         enabled = schedule!.enabled;
         localPath = schedule!.localPath;
@@ -143,7 +143,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
         nextRunAt: nextRun,
       );
 
-      final id = await repository.saveDumpSchedule(updated);
+      final id = await saveDumpSchedule.execute(updated);
       schedule = updated.copyWith(id: id);
       successMessage = enabled
           ? 'Volcado recurrente guardado'
@@ -162,3 +162,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+
+
+

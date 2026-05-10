@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/file_version.dart';
@@ -7,42 +7,55 @@ import '../../../domain/entities/system_event.dart';
 import '../../../domain/entities/system_health_summary.dart';
 import '../../../domain/entities/system_recommendation.dart';
 import '../../../domain/entities/system_usage_stats.dart';
-import '../../../domain/repositories/ftp_repository.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/system_health_viewmodel.dart';
+import '../../viewmodels/system_health_view_model.dart';
 import 'file_version_history_screen.dart';
+import '../../../domain/interfaces/i_acknowledge_alert_use_case.dart';
+import '../../../domain/interfaces/i_analyze_system_usage_use_case.dart';
+import '../../../domain/interfaces/i_build_system_health_report_use_case.dart';
+import '../../../domain/interfaces/i_generate_system_recommendations_use_case.dart';
+import '../../../domain/interfaces/i_get_active_alerts_use_case.dart';
+import '../../../domain/interfaces/i_get_health_summary_use_case.dart';
+import '../../../domain/interfaces/i_get_profiles_use_case.dart';
+import '../../../domain/interfaces/i_get_recent_events_use_case.dart';
+import '../../../domain/interfaces/i_get_recent_file_versions_use_case.dart';
+import '../../../domain/interfaces/i_get_recent_syncs_use_case.dart';
 
 class HealthCenterScreen extends StatelessWidget {
-  final MonitoringRepository repository;
-  final FtpRepository ftpRepository;
   final String ownerId;
 
   const HealthCenterScreen({
     super.key,
-    required this.repository,
-    required this.ftpRepository,
     required this.ownerId,
   });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => SystemHealthViewModel(
-        repository: repository,
-        ftpRepository: ftpRepository,
+      create: (context) => SystemHealthViewModel(
+        getHealthSummary: context.read<IGetHealthSummaryUseCase>(),
+        getRecentEvents: context.read<IGetRecentEventsUseCase>(),
+        getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
+        getRecentSyncs: context.read<IGetRecentSyncsUseCase>(),
+        getRecentFileVersions: context.read<IGetRecentFileVersionsUseCase>(),
+        getProfiles: context.read<IGetProfilesUseCase>(),
+        acknowledgeAlert: context.read<IAcknowledgeAlertUseCase>(),
         ownerId: ownerId,
+        buildSystemHealthReport:
+            context.read<IBuildSystemHealthReportUseCase>(),
+        generateSystemRecommendations:
+            context.read<IGenerateSystemRecommendationsUseCase>(),
+        analyzeSystemUsage: context.read<IAnalyzeSystemUsageUseCase>(),
       )..load(),
-      child: _HealthCenterBody(repository: repository, ownerId: ownerId),
+      child: _HealthCenterBody(ownerId: ownerId),
     );
   }
 }
 
 class _HealthCenterBody extends StatelessWidget {
-  final MonitoringRepository repository;
   final String ownerId;
 
-  const _HealthCenterBody({required this.repository, required this.ownerId});
+  const _HealthCenterBody({required this.ownerId});
 
   @override
   Widget build(BuildContext context) {
@@ -98,20 +111,20 @@ class _HealthCenterBody extends StatelessWidget {
                     _Banner(
                       color: AppTheme.success.withValues(alpha: 0.1),
                       icon: Icons.check_circle_outline,
-                      text: 'Último informe exportado en ${vm.lastExportPath}',
+                      text: 'Ãšltimo informe exportado en ${vm.lastExportPath}',
                     ),
                     const SizedBox(height: 16),
                   ],
                   _StatusCard(summary: summary),
                   const SizedBox(height: 16),
                   _SectionHeader(
-                    title: 'Estadísticas y patrones',
+                    title: 'EstadÃ­sticas y patrones',
                     subtitle:
-                        'Análisis de uso para apoyar decisiones automáticas',
+                        'AnÃ¡lisis de uso para apoyar decisiones automÃ¡ticas',
                   ),
                   const SizedBox(height: 8),
                   if (vm.usageStats == null)
-                    const _EmptyState(text: 'Todavía no hay suficientes datos')
+                    const _EmptyState(text: 'TodavÃ­a no hay suficientes datos')
                   else
                     _UsageStatsCard(stats: vm.usageStats!),
                   const SizedBox(height: 16),
@@ -121,7 +134,7 @@ class _HealthCenterBody extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   if (vm.recommendations.isEmpty)
-                    const _EmptyState(text: 'Todavía no hay recomendaciones')
+                    const _EmptyState(text: 'TodavÃ­a no hay recomendaciones')
                   else
                     ...vm.recommendations.map(
                       (recommendation) => Padding(
@@ -139,7 +152,7 @@ class _HealthCenterBody extends StatelessWidget {
                   const SizedBox(height: 8),
                   if (vm.recentFileVersions.isEmpty)
                     const _EmptyState(
-                      text: 'Todavía no hay versiones registradas',
+                      text: 'TodavÃ­a no hay versiones registradas',
                     )
                   else
                     ...vm.recentFileVersions.map(
@@ -151,7 +164,6 @@ class _HealthCenterBody extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => FileVersionHistoryScreen(
-                                repository: repository,
                                 ownerId: ownerId,
                                 profileId: version.profileId,
                                 filePath: version.filePath,
@@ -165,7 +177,7 @@ class _HealthCenterBody extends StatelessWidget {
                   const SizedBox(height: 16),
                   _SectionHeader(
                     title: 'Alertas activas',
-                    subtitle: 'Señales que requieren revisión',
+                    subtitle: 'SeÃ±ales que requieren revisiÃ³n',
                   ),
                   const SizedBox(height: 8),
                   if (vm.activeAlerts.isEmpty)
@@ -183,11 +195,11 @@ class _HealthCenterBody extends StatelessWidget {
                   const SizedBox(height: 16),
                   _SectionHeader(
                     title: 'Actividad reciente',
-                    subtitle: 'Auditoría técnica de sincronización y eventos',
+                    subtitle: 'AuditorÃ­a tÃ©cnica de sincronizaciÃ³n y eventos',
                   ),
                   const SizedBox(height: 8),
                   if (vm.recentEvents.isEmpty)
-                    const _EmptyState(text: 'Todavía no hay eventos')
+                    const _EmptyState(text: 'TodavÃ­a no hay eventos')
                   else
                     ...vm.recentEvents.map(
                       (event) => Padding(
@@ -271,7 +283,7 @@ class _StatusCard extends StatelessWidget {
                 summary?.lastEventAt != null) ...[
               const SizedBox(height: 12),
               Text(
-                'Última sincronización: ${summary?.lastSyncAt != null ? summary!.lastSyncAt!.toLocal() : 'Sin datos'}',
+                'Ãšltima sincronizaciÃ³n: ${summary?.lastSyncAt != null ? summary!.lastSyncAt!.toLocal() : 'Sin datos'}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.onSurfaceMuted,
@@ -279,7 +291,7 @@ class _StatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Último evento: ${summary?.lastEventAt != null ? summary!.lastEventAt!.toLocal() : 'Sin datos'}',
+                'Ãšltimo evento: ${summary?.lastEventAt != null ? summary!.lastEventAt!.toLocal() : 'Sin datos'}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.onSurfaceMuted,
@@ -320,7 +332,7 @@ class _MetricChip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -341,14 +353,52 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: AppTheme.primary,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
-          style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceMuted),
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppTheme.onSurfaceMuted,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String text;
+
+  const _Banner({
+    required this.color,
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
     );
   }
 }
@@ -363,98 +413,41 @@ class _EmptyState extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(
-          text,
-          style: const TextStyle(color: AppTheme.onSurfaceMuted),
-        ),
+        child: Text(text),
       ),
     );
   }
 }
 
-class _AlertCard extends StatelessWidget {
-  final SystemAlert alert;
-  final VoidCallback onAcknowledge;
+class _UsageStatsCard extends StatelessWidget {
+  final SystemUsageStats stats;
 
-  const _AlertCard({required this.alert, required this.onAcknowledge});
-
-  Color _severityColor() {
-    return switch (alert.severity.name) {
-      'error' => AppTheme.error,
-      'warning' => AppTheme.warning,
-      _ => AppTheme.primary,
-    };
-  }
+  const _UsageStatsCard({required this.stats});
 
   @override
   Widget build(BuildContext context) {
-    final color = _severityColor();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.notification_important_outlined, color: color),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    alert.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                TextButton(
-                  onPressed: onAcknowledge,
-                  child: const Text('Marcar leída'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(alert.message),
-            const SizedBox(height: 8),
-            Text(
-              '${alert.source} · ${alert.createdAt.toLocal()}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.onSurfaceMuted,
-              ),
-            ),
-          ],
+        child: Text(
+          'Ã‰xito: ${(stats.successRate * 100).toStringAsFixed(0)}%, perfil top: ${stats.topProfileName ?? 'Sin datos'}',
         ),
       ),
     );
   }
 }
 
-class _EventCard extends StatelessWidget {
-  final SystemEvent event;
-  final String Function(DateTime) formatDateTime;
+class _RecommendationCard extends StatelessWidget {
+  final SystemRecommendation recommendation;
 
-  const _EventCard({required this.event, required this.formatDateTime});
-
-  Color _severityColor() {
-    return switch (event.severity.name) {
-      'error' => AppTheme.error,
-      'warning' => AppTheme.warning,
-      'success' => AppTheme.success,
-      _ => AppTheme.primary,
-    };
-  }
+  const _RecommendationCard({required this.recommendation});
 
   @override
   Widget build(BuildContext context) {
-    final color = _severityColor();
     return Card(
       child: ListTile(
-        leading: Icon(Icons.timeline, color: color),
-        title: Text(event.title),
-        subtitle: Text(
-          '${event.message}\n${formatDateTime(event.createdAt)}',
-          style: const TextStyle(fontSize: 12),
-        ),
-        isThreeLine: true,
+        title: Text(recommendation.title),
+        subtitle: Text(recommendation.message),
       ),
     );
   }
@@ -468,204 +461,54 @@ class _VersionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.restore_rounded, color: AppTheme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      version.fileName,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Versión ${version.versionNumber} · ${version.source}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.onSurfaceMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tamaño: ${version.size} bytes',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.onSurfaceMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendationCard extends StatelessWidget {
-  final SystemRecommendation recommendation;
-
-  const _RecommendationCard({required this.recommendation});
-
-  Color _kindColor() {
-    return switch (recommendation.kind) {
-      SystemRecommendationKind.positive => AppTheme.success,
-      SystemRecommendationKind.warning => AppTheme.warning,
-      SystemRecommendationKind.action => AppTheme.primary,
-    };
-  }
-
-  IconData _kindIcon() {
-    return switch (recommendation.kind) {
-      SystemRecommendationKind.positive => Icons.thumb_up_alt_outlined,
-      SystemRecommendationKind.warning => Icons.insights_outlined,
-      SystemRecommendationKind.action => Icons.auto_awesome_outlined,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _kindColor();
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(_kindIcon(), color: color),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    recommendation.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(recommendation.message),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: ListTile(
+        title: Text(version.fileName),
+        subtitle: Text(version.filePath),
+        onTap: onTap,
       ),
     );
   }
 }
 
-class _UsageStatsCard extends StatelessWidget {
-  final SystemUsageStats stats;
+class _AlertCard extends StatelessWidget {
+  final SystemAlert alert;
+  final VoidCallback onAcknowledge;
 
-  const _UsageStatsCard({required this.stats});
-
-  String _formatPercent(double value) {
-    return '${(value * 100).toStringAsFixed(0)}%';
-  }
-
-  String _hourLabel(int? hour) {
-    if (hour == null) return 'Sin datos';
-    return '${hour.toString().padLeft(2, '0')}:00';
-  }
+  const _AlertCard({required this.alert, required this.onAcknowledge});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _MetricChip(
-                  label: 'Éxito',
-                  value: _formatPercent(stats.successRate),
-                ),
-                _MetricChip(label: 'Fallos', value: '${stats.failedSyncs}'),
-                _MetricChip(
-                  label: 'Media archivos',
-                  value: stats.averageFilesTransferred.toStringAsFixed(1),
-                ),
-                _MetricChip(
-                  label: 'Franja activa',
-                  value: _hourLabel(stats.peakHour),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              stats.topProfileName != null
-                  ? 'Perfil más activo: ${stats.topProfileName}'
-                  : 'Perfil más activo: Sin datos',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Sincronizaciones en ese perfil: ${stats.topProfileSyncs}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.onSurfaceMuted,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Éxitos: ${stats.successfulSyncs} · Fallos: ${stats.failedSyncs}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.onSurfaceMuted,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              stats.peakHour == null
-                  ? 'Aún no hay una hora predominante.'
-                  : 'La franja más usada es ${_hourLabel(stats.peakHour)} con ${stats.peakHourCount} sincronizaciones exitosas.',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
+      child: ListTile(
+        title: Text(alert.title),
+        subtitle: Text(alert.message),
+        trailing: TextButton(
+          onPressed: onAcknowledge,
+          child: const Text('OK'),
         ),
       ),
     );
   }
 }
 
-class _Banner extends StatelessWidget {
-  final Color color;
-  final IconData icon;
-  final String text;
+class _EventCard extends StatelessWidget {
+  final SystemEvent event;
+  final String Function(DateTime) formatDateTime;
 
-  const _Banner({required this.color, required this.icon, required this.text});
+  const _EventCard({required this.event, required this.formatDateTime});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppTheme.error),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text)),
-        ],
+    return Card(
+      child: ListTile(
+        title: Text(event.title),
+        subtitle: Text(event.message),
       ),
     );
   }
 }
+
+
+
+

@@ -1,25 +1,28 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../domain/entities/dump_schedule.dart';
+import '../../../core/services/dump_transfer_service.dart';
 import '../../../domain/entities/ftp_profile.dart';
-import '../../../domain/repositories/ftp_repository.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/dump_schedule_viewmodel.dart';
-import '../../viewmodels/sync_viewmodel.dart';
+import '../../viewmodels/dump_schedule_view_model.dart';
+import '../../viewmodels/sync_view_model.dart';
+import '../../../domain/interfaces/i_create_alert_use_case.dart';
+import '../../../domain/interfaces/i_detect_conflicts_use_case.dart';
+import '../../../domain/interfaces/i_evaluate_sync_rules_use_case.dart';
+import '../../../domain/interfaces/i_get_active_alerts_use_case.dart';
+import '../../../domain/interfaces/i_get_dump_schedule_for_profile_use_case.dart';
+import '../../../domain/interfaces/i_get_sync_history_use_case.dart';
+import '../../../domain/interfaces/i_record_event_use_case.dart';
+import '../../../domain/interfaces/i_save_dump_schedule_use_case.dart';
+import '../../../domain/interfaces/i_save_sync_record_use_case.dart';
 
 class SyncScreen extends StatelessWidget {
   final FtpProfile profile;
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
   final String ownerId;
 
   const SyncScreen({
     super.key,
     required this.profile,
-    required this.repository,
-    required this.monitoringRepository,
     required this.ownerId,
   });
 
@@ -28,16 +31,24 @@ class SyncScreen extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => SyncViewModel(
-            repository: repository,
-            monitoringRepository: monitoringRepository,
+          create: (context) => SyncViewModel(
+            detectConflicts: context.read<IDetectConflictsUseCase>(),
+            saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
+            getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
+            getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
+            evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
+            recordEvent: context.read<IRecordEventUseCase>(),
+            createAlert: context.read<ICreateAlertUseCase>(),
             profile: profile,
             ownerId: ownerId,
+            transferService: context.read<DumpTransferService>(),
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => DumpScheduleViewModel(
-            repository: repository,
+          create: (context) => DumpScheduleViewModel(
+            getDumpScheduleForProfile:
+                context.read<IGetDumpScheduleForProfileUseCase>(),
+            saveDumpSchedule: context.read<ISaveDumpScheduleUseCase>(),
             profile: profile,
             ownerId: ownerId,
           )..loadSchedule(),
@@ -258,31 +269,34 @@ class _SyncBody extends StatelessWidget {
                       ),
                     )
                   : const Icon(Icons.sync),
-              label: Text(
-                vm.isSyncing ? 'Sincronizando...' : 'Iniciar sincronizacion',
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-            ),
-            const SizedBox(height: 28),
-            const Text(
-              'VOLUMEN RECURRENTE',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-              ),
+              label: const Text('Iniciar sincronizacion'),
             ),
             const SizedBox(height: 12),
             if (scheduleVm.isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else
-              const _ScheduleEditor(),
+              const Center(child: CircularProgressIndicator())
+            else if (scheduleVm.schedule != null)
+              Card(
+                child: ListTile(
+                  leading: Icon(
+                    scheduleVm.enabled
+                        ? Icons.schedule
+                        : Icons.schedule_outlined,
+                    color: scheduleVm.enabled
+                        ? AppTheme.primary
+                        : AppTheme.onSurfaceMuted,
+                  ),
+                  title: Text(
+                    scheduleVm.enabled
+                        ? 'Volcado recurrente activo'
+                        : 'Volcado recurrente desactivado',
+                  ),
+                  subtitle: Text(
+                    scheduleVm.enabled
+                        ? 'PrÃ³xima ejecuciÃ³n: ${scheduleVm.schedule!.nextRunAt ?? 'Sin fecha'}'
+                        : 'Guarda la programaciÃ³n para activarlo',
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -292,299 +306,31 @@ class _SyncBody extends StatelessWidget {
 
 class _ModeSelector extends StatelessWidget {
   final SyncMode selected;
-  final void Function(SyncMode)? onChanged;
-  const _ModeSelector({required this.selected, this.onChanged});
+  final ValueChanged<SyncMode>? onChanged;
+
+  const _ModeSelector({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: SyncMode.values.map((mode) {
-        final isSelected = mode == selected;
-        final label = switch (mode) {
-          SyncMode.push => 'Push',
-          SyncMode.pull => 'Pull',
-          SyncMode.bidirectional => 'Bidireccional',
-        };
-        final icon = switch (mode) {
-          SyncMode.push => Icons.upload,
-          SyncMode.pull => Icons.download,
-          SyncMode.bidirectional => Icons.sync_alt,
-        };
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: GestureDetector(
-              onTap: onChanged == null ? null : () => onChanged!(mode),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.primary.withValues(alpha: 0.15)
-                      : AppTheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppTheme.primary
-                        : const Color(0xFF30363D),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      icon,
-                      color: isSelected
-                          ? AppTheme.primary
-                          : AppTheme.onSurfaceMuted,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isSelected
-                            ? AppTheme.primary
-                            : AppTheme.onSurfaceMuted,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ],
+      children: SyncMode.values
+          .map(
+            (mode) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text(mode.name),
+                  selected: selected == mode,
+                  onSelected: onChanged == null ? null : (_) => onChanged!(mode),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          )
+          .toList(),
     );
   }
 }
 
 
-class _ScheduleEditor extends StatefulWidget {
-  const _ScheduleEditor();
-
-  @override
-  State<_ScheduleEditor> createState() => _ScheduleEditorState();
-}
-
-class _ScheduleEditorState extends State<_ScheduleEditor> {
-  final TextEditingController _localController = TextEditingController();
-  final TextEditingController _remoteController = TextEditingController();
-  final TextEditingController _intervalController = TextEditingController();
-  DumpScheduleViewModel? _vm;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final vm = context.read<DumpScheduleViewModel>();
-    if (_vm != vm) {
-      _vm?.removeListener(_syncControllers);
-      _vm = vm;
-      _vm!.addListener(_syncControllers);
-      _syncControllers();
-    }
-  }
-
-  void _syncControllers() {
-    final vm = context.read<DumpScheduleViewModel>();
-    if (_localController.text != vm.localPath) {
-      _localController.text = vm.localPath;
-    }
-    if (_remoteController.text != vm.remotePath) {
-      _remoteController.text = vm.remotePath;
-    }
-    final intervalText = vm.intervalValue.toString();
-    if (_intervalController.text != intervalText) {
-      _intervalController.text = intervalText;
-    }
-  }
-
-  @override
-  void dispose() {
-    _vm?.removeListener(_syncControllers);
-    _localController.dispose();
-    _remoteController.dispose();
-    _intervalController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheduleVm = context.watch<DumpScheduleViewModel>();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: scheduleVm.enabled,
-              onChanged: scheduleVm.setEnabled,
-              title: const Text('Activar volcado recurrente'),
-              subtitle: const Text(
-                'Se ejecuta de forma periódica mientras la app esté activa.',
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _localController,
-              onChanged: scheduleVm.setLocalPath,
-              decoration: const InputDecoration(
-                labelText: 'Ruta local de origen/destino',
-                hintText: '/storage/emulated/0/Download',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _remoteController,
-              onChanged: scheduleVm.setRemotePath,
-              decoration: const InputDecoration(
-                labelText: 'Ruta remota de origen/destino',
-                hintText: '/',
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<DumpTransferMode>(
-              initialValue: scheduleVm.transferMode,
-              decoration: const InputDecoration(
-                labelText: 'Tipo de volcado',
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: DumpTransferMode.oneWay,
-                  child: Text('De un sitio a otro'),
-                ),
-                DropdownMenuItem(
-                  value: DumpTransferMode.syncBoth,
-                  child: Text('Sincronizar ambos lados'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value != null) scheduleVm.setTransferMode(value);
-              },
-            ),
-            const SizedBox(height: 12),
-            if (scheduleVm.transferMode == DumpTransferMode.oneWay) ...[
-              DropdownButtonFormField<DumpSourceSide>(
-                initialValue: scheduleVm.sourceSide,
-                decoration: const InputDecoration(
-                  labelText: 'Origen',
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: DumpSourceSide.local,
-                    child: Text('Local'),
-                  ),
-                  DropdownMenuItem(
-                    value: DumpSourceSide.remote,
-                    child: Text('Remoto'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) scheduleVm.setSourceSide(value);
-                },
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: scheduleVm.deleteSourceAfterCopy,
-                onChanged: scheduleVm.setDeleteSourceAfterCopy,
-                title: const Text('Eliminar del origen tras copiar'),
-                subtitle: const Text(
-                  'Si se desactiva, el origen se conserva.',
-                ),
-              ),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _intervalController,
-                    keyboardType: TextInputType.number,
-                    onChanged: scheduleVm.setIntervalValue,
-                    decoration: const InputDecoration(
-                      labelText: 'Cada',
-                      helperText: 'Número de horas o días',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<DumpIntervalUnit>(
-                    initialValue: scheduleVm.intervalUnit,
-                    decoration: const InputDecoration(
-                      labelText: 'Unidad',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: DumpIntervalUnit.hours,
-                        child: Text('Horas'),
-                      ),
-                      DropdownMenuItem(
-                        value: DumpIntervalUnit.days,
-                        child: Text('Días'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) scheduleVm.setIntervalUnit(value);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            if (scheduleVm.schedule?.nextRunAt != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Próxima ejecución: ${scheduleVm.schedule!.nextRunAt}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.onSurfaceMuted,
-                ),
-              ),
-            ],
-            if (scheduleVm.error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                scheduleVm.error!,
-                style: const TextStyle(color: AppTheme.error),
-              ),
-            ],
-            if (scheduleVm.successMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                scheduleVm.successMessage!,
-                style: const TextStyle(color: AppTheme.success),
-              ),
-            ],
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: scheduleVm.isSaving
-                  ? null
-                  : () => scheduleVm.saveSchedule(),
-              icon: scheduleVm.isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    )
-                  : const Icon(Icons.schedule),
-              label: Text(
-                scheduleVm.isSaving
-                    ? 'Guardando...'
-                    : 'Guardar volcado recurrente',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 

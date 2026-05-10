@@ -1,9 +1,11 @@
-import '../entities/system_alert.dart';
+﻿import '../entities/system_alert.dart';
 import '../entities/sync_record.dart';
+import '../interfaces/i_evaluate_sync_rules_use_case.dart';
 
-class EvaluateSyncRules {
+class EvaluateSyncRules implements IEvaluateSyncRulesUseCase {
   const EvaluateSyncRules();
 
+  @override
   List<SystemAlert> execute({
     required String ownerId,
     required int profileId,
@@ -68,3 +70,7 @@ class EvaluateSyncRules {
     );
   }
 }
+
+
+
+

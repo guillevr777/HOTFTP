@@ -1,4 +1,4 @@
-class LocalFile {
+﻿class LocalFile {
   final String name;
   final String path;
   final int size;
@@ -15,3 +15,4 @@ class LocalFile {
     this.extension,
   });
 }
+

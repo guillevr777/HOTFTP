@@ -1,4 +1,4 @@
-enum SystemRecommendationKind { positive, warning, action }
+﻿enum SystemRecommendationKind { positive, warning, action }
 
 class SystemRecommendation {
   final String title;
@@ -11,3 +11,4 @@ class SystemRecommendation {
     required this.kind,
   });
 }
+

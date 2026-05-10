@@ -1,10 +1,12 @@
-import '../entities/ftp_profile.dart';
+﻿import '../entities/ftp_profile.dart';
 import '../entities/system_usage_stats.dart';
 import '../entities/sync_record.dart';
+import '../interfaces/i_analyze_system_usage_use_case.dart';
 
-class AnalyzeSystemUsage {
+class AnalyzeSystemUsage implements IAnalyzeSystemUsageUseCase {
   const AnalyzeSystemUsage();
 
+  @override
   SystemUsageStats execute({
     required List<SyncRecord> syncs,
     required List<FtpProfile> profiles,
@@ -65,3 +67,7 @@ class AnalyzeSystemUsage {
     );
   }
 }
+
+
+
+

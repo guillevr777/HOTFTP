@@ -63,3 +63,4 @@
         passiveMode: map['passiveMode'] == 1,
       );
 }
+

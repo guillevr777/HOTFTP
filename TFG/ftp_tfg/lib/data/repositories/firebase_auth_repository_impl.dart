@@ -1,4 +1,4 @@
-import '../../domain/entities/app_user.dart';
+﻿import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/firebase_auth_datasource.dart';
 
@@ -48,3 +48,6 @@ class FirebaseAuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> signOut() => datasource.signOut();
 }
+
+
+

@@ -1,4 +1,4 @@
-class SystemUsageStats {
+﻿class SystemUsageStats {
   final int totalSyncs;
   final int successfulSyncs;
   final int failedSyncs;
@@ -23,3 +23,4 @@ class SystemUsageStats {
     required this.topProfileSyncs,
   });
 }
+

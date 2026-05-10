@@ -1,11 +1,13 @@
-import '../../../domain/entities/app_user.dart';
+﻿import '../../../domain/entities/app_user.dart';
 import '../../../domain/repositories/auth_repository.dart';
+import '../../interfaces/i_register_user_use_case.dart';
 
-class RegisterUser {
+class RegisterUser implements IRegisterUserUseCase {
   final AuthRepository repository;
 
   RegisterUser(this.repository);
 
+  @override
   Future<AppUser> execute({
     required String email,
     required String password,
@@ -17,3 +19,7 @@ class RegisterUser {
         displayName: displayName,
       );
 }
+
+
+
+

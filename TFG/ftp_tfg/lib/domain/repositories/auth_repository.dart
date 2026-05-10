@@ -1,4 +1,4 @@
-import '../entities/app_user.dart';
+﻿import '../entities/app_user.dart';
 
 abstract class AuthRepository {
   Stream<AppUser?> authStateChanges();
@@ -18,3 +18,6 @@ abstract class AuthRepository {
   Future<void> sendPasswordResetEmail(String email);
   Future<void> signOut();
 }
+
+
+

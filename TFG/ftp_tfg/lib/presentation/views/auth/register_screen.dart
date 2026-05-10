@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/auth_viewmodel.dart';
+import '../../viewmodels/auth_view_model.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -68,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Cada usuario tendrá su sesión Firebase y acceso propio a los perfiles.',
+                'Cada usuario tendrÃ¡ su sesiÃ³n Firebase y acceso propio a los perfiles.',
                 style: TextStyle(color: AppTheme.onSurfaceMuted),
               ),
               const SizedBox(height: 24),
@@ -86,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'Correo electrónico',
+                  labelText: 'Correo electrÃ³nico',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 validator: (value) {
@@ -94,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return 'Introduce un correo';
                   }
                   if (!value.contains('@')) {
-                    return 'Introduce un correo válido';
+                    return 'Introduce un correo vÃ¡lido';
                   }
                   return null;
                 },
@@ -104,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'Contraseña',
+                  labelText: 'ContraseÃ±a',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -126,7 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _confirmController,
                 obscureText: _obscureConfirm,
                 decoration: InputDecoration(
-                  labelText: 'Confirmar contraseña',
+                  labelText: 'Confirmar contraseÃ±a',
                   prefixIcon: const Icon(Icons.lock_reset_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -138,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: (value) {
                   if (value != _passwordController.text) {
-                    return 'Las contraseñas no coinciden';
+                    return 'Las contraseÃ±as no coinciden';
                   }
                   return null;
                 },
@@ -162,3 +162,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+
+
+

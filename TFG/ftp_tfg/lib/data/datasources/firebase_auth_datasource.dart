@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -138,7 +138,7 @@ class FirebaseAuthDatasource {
     if (hasPasswordProvider) {
       throw FirebaseAuthException(
         code: 'provider-already-linked',
-        message: 'La cuenta ya tiene acceso con correo y contraseña',
+        message: 'La cuenta ya tiene acceso con correo y contraseÃ±a',
       );
     }
 
@@ -151,7 +151,7 @@ class FirebaseAuthDatasource {
     if (linkedUser == null) {
       throw FirebaseAuthException(
         code: 'null-user',
-        message: 'No se pudo vincular el acceso con correo y contraseña',
+        message: 'No se pudo vincular el acceso con correo y contraseÃ±a',
       );
     }
     return linkedUser;
@@ -169,7 +169,7 @@ class FirebaseAuthDatasource {
     if (trimmed.isEmpty) {
       throw FirebaseAuthException(
         code: 'invalid-display-name',
-        message: 'El nombre no puede estar vacío',
+        message: 'El nombre no puede estar vacÃ­o',
       );
     }
     await user.updateDisplayName(trimmed);
@@ -194,7 +194,7 @@ class FirebaseAuthDatasource {
       throw FirebaseAuthException(
         code: 'no-password-provider-linked',
         message:
-            'Esta cuenta se inicia con Google y todavía no tiene una contraseña vinculada.',
+            'Esta cuenta se inicia con Google y todavÃ­a no tiene una contraseÃ±a vinculada.',
       );
     }
     await _auth.sendPasswordResetEmail(email: email);
@@ -218,7 +218,7 @@ class FirebaseAuthDatasource {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw FirebaseAuthException(
         code: 'network-request-failed',
-        message: 'No se pudo comprobar los métodos de inicio de sesión',
+        message: 'No se pudo comprobar los mÃ©todos de inicio de sesiÃ³n',
       );
     }
 
@@ -237,3 +237,6 @@ class FirebaseAuthDatasource {
     await Future.wait([_auth.signOut(), if (!kIsWeb) _googleSignIn.signOut()]);
   }
 }
+
+
+

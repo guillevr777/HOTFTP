@@ -1,4 +1,4 @@
-import '../../domain/entities/dump_schedule.dart';
+﻿import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/local_file.dart';
 import '../../domain/entities/remote_file.dart';
@@ -166,3 +166,6 @@ class DumpTransferService {
 }
 
 enum _TransferDirection { upload, download, skip }
+
+
+

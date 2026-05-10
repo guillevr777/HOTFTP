@@ -1,4 +1,4 @@
-enum SystemAlertSeverity { info, warning, error }
+﻿enum SystemAlertSeverity { info, warning, error }
 
 class SystemAlert {
   final int? id;
@@ -57,3 +57,4 @@ class SystemAlert {
             : DateTime.tryParse(map['resolvedAt'] as String),
       );
 }
+

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/system_alert.dart';
@@ -6,21 +6,25 @@ import '../../domain/entities/system_event.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
 import '../../domain/repositories/monitoring_repository.dart';
-import '../../domain/usecases/evaluate_sync_rules.dart';
 import 'dump_transfer_service.dart';
+import '../../domain/interfaces/i_evaluate_sync_rules_use_case.dart';
 
 class RecurringDumpService {
   final FtpRepository repository;
   final MonitoringRepository? monitoringRepository;
   final DumpTransferService transferService;
-  final EvaluateSyncRules _evaluateSyncRules = const EvaluateSyncRules();
+  final IEvaluateSyncRulesUseCase _evaluateSyncRules;
 
   Timer? _timer;
   String? _ownerId;
   bool _isProcessing = false;
 
-  RecurringDumpService(this.repository, {this.monitoringRepository})
-    : transferService = DumpTransferService(repository);
+  RecurringDumpService(
+    this.repository, {
+    this.monitoringRepository,
+    required IEvaluateSyncRulesUseCase evaluateSyncRules,
+  }) : transferService = DumpTransferService(repository),
+       _evaluateSyncRules = evaluateSyncRules;
 
   void start(String ownerId) {
     if (_ownerId == ownerId && _timer != null) return;
@@ -158,7 +162,7 @@ class RecurringDumpService {
         await monitoring.createAlert(alert);
       }
     } catch (_) {
-      // Las reglas automáticas nunca deben bloquear la ejecución programada.
+      // Las reglas automÃ¡ticas nunca deben bloquear la ejecuciÃ³n programada.
     }
   }
 
@@ -219,3 +223,7 @@ class RecurringDumpService {
     } catch (_) {}
   }
 }
+
+
+
+

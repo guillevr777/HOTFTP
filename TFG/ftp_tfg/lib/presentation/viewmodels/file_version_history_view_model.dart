@@ -1,16 +1,16 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_version.dart';
-import '../../domain/repositories/monitoring_repository.dart';
+import '../../domain/interfaces/i_get_file_version_history_use_case.dart';
 
 class FileVersionHistoryViewModel extends ChangeNotifier {
-  final MonitoringRepository repository;
+  final IGetFileVersionHistoryUseCase getFileVersionHistory;
   final String ownerId;
   final int profileId;
   final String filePath;
 
   FileVersionHistoryViewModel({
-    required this.repository,
+    required this.getFileVersionHistory,
     required this.ownerId,
     required this.profileId,
     required this.filePath,
@@ -25,7 +25,7 @@ class FileVersionHistoryViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      versions = await repository.getFileVersionHistory(
+      versions = await getFileVersionHistory.execute(
         ownerId,
         profileId,
         filePath,
@@ -44,3 +44,7 @@ class FileVersionHistoryViewModel extends ChangeNotifier {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
+
+
+
+

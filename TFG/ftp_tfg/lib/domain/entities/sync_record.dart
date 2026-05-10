@@ -1,4 +1,4 @@
-class SyncRecord {
+﻿class SyncRecord {
   final int? id;
   final String ownerId;
   final int profileId;
@@ -49,3 +49,4 @@ class SyncRecord {
         errorMessage: map['errorMessage'] as String?,
       );
 }
+

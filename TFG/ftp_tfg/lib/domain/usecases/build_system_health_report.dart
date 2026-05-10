@@ -1,14 +1,16 @@
-import '../entities/file_version.dart';
+﻿import '../entities/file_version.dart';
 import '../entities/system_alert.dart';
 import '../entities/system_event.dart';
 import '../entities/system_health_summary.dart';
 import '../entities/system_recommendation.dart';
 import '../entities/system_usage_stats.dart';
 import '../entities/sync_record.dart';
+import '../interfaces/i_build_system_health_report_use_case.dart';
 
-class BuildSystemHealthReport {
+class BuildSystemHealthReport implements IBuildSystemHealthReportUseCase {
   const BuildSystemHealthReport();
 
+  @override
   String execute({
     required SystemHealthSummary summary,
     required List<SystemEvent> recentEvents,
@@ -20,7 +22,7 @@ class BuildSystemHealthReport {
     required DateTime generatedAt,
   }) {
     final buffer = StringBuffer()
-      ..writeln('HOTFTP - Informe técnico')
+      ..writeln('HOTFTP - Informe tÃ©cnico')
       ..writeln('Generado: ${generatedAt.toIso8601String()}')
       ..writeln()
       ..writeln('Resumen general')
@@ -30,10 +32,10 @@ class BuildSystemHealthReport {
       ..writeln('- Alertas activas: ${summary.unresolvedAlerts}')
       ..writeln('- Sincronizaciones con error: ${summary.errorSyncs}')
       ..writeln(
-        '- Última sincronización: ${summary.lastSyncAt?.toIso8601String() ?? 'Sin datos'}',
+        '- Ãšltima sincronizaciÃ³n: ${summary.lastSyncAt?.toIso8601String() ?? 'Sin datos'}',
       )
       ..writeln(
-        '- Último evento: ${summary.lastEventAt?.toIso8601String() ?? 'Sin datos'}',
+        '- Ãšltimo evento: ${summary.lastEventAt?.toIso8601String() ?? 'Sin datos'}',
       )
       ..writeln();
 
@@ -41,7 +43,7 @@ class BuildSystemHealthReport {
       buffer
         ..writeln('Patrones de uso')
         ..writeln(
-          '- Tasa de éxito: ${(usageStats.successRate * 100).toStringAsFixed(0)}%',
+          '- Tasa de Ã©xito: ${(usageStats.successRate * 100).toStringAsFixed(0)}%',
         )
         ..writeln('- Sincronizaciones correctas: ${usageStats.successfulSyncs}')
         ..writeln('- Fallos: ${usageStats.failedSyncs}')
@@ -52,7 +54,7 @@ class BuildSystemHealthReport {
           '- Hora pico: ${usageStats.peakHour == null ? 'Sin datos' : '${usageStats.peakHour!.toString().padLeft(2, '0')}:00'}',
         )
         ..writeln(
-          '- Perfil más activo: ${usageStats.topProfileName ?? 'Sin datos'}',
+          '- Perfil mÃ¡s activo: ${usageStats.topProfileName ?? 'Sin datos'}',
         )
         ..writeln(
           '- Sincronizaciones del perfil principal: ${usageStats.topProfileSyncs}',
@@ -124,3 +126,7 @@ class BuildSystemHealthReport {
     return buffer.toString();
   }
 }
+
+
+
+

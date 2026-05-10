@@ -1,35 +1,43 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/dump_transfer_service.dart';
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/sync_record.dart';
-import '../../../domain/repositories/ftp_repository.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/sync_viewmodel.dart';
+import '../../viewmodels/sync_view_model.dart';
+import '../../../domain/interfaces/i_create_alert_use_case.dart';
+import '../../../domain/interfaces/i_detect_conflicts_use_case.dart';
+import '../../../domain/interfaces/i_evaluate_sync_rules_use_case.dart';
+import '../../../domain/interfaces/i_get_active_alerts_use_case.dart';
+import '../../../domain/interfaces/i_get_sync_history_use_case.dart';
+import '../../../domain/interfaces/i_record_event_use_case.dart';
+import '../../../domain/interfaces/i_save_sync_record_use_case.dart';
 
 class HistoryScreen extends StatelessWidget {
   final FtpProfile profile;
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
   final String ownerId;
 
   const HistoryScreen({
     super.key,
     required this.profile,
-    required this.repository,
-    required this.monitoringRepository,
     required this.ownerId,
   });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => SyncViewModel(
-        repository: repository,
-        monitoringRepository: monitoringRepository,
+      create: (context) => SyncViewModel(
+        detectConflicts: context.read<IDetectConflictsUseCase>(),
+        saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
+        getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
+        getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
+        evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
+        recordEvent: context.read<IRecordEventUseCase>(),
+        createAlert: context.read<ICreateAlertUseCase>(),
         profile: profile,
         ownerId: ownerId,
+        transferService: context.read<DumpTransferService>(),
       )..loadHistory(),
       child: const _HistoryBody(),
     );
@@ -200,3 +208,7 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
+
+
+
+

@@ -1,4 +1,4 @@
-class RemoteFile {
+﻿class RemoteFile {
   final String name;
   final String path;
   final int size;
@@ -13,3 +13,4 @@ class RemoteFile {
     this.modifiedAt,
   });
 }
+

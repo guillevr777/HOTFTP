@@ -1,4 +1,4 @@
-class SystemHealthSummary {
+﻿class SystemHealthSummary {
   final int totalProfiles;
   final int totalSyncs;
   final int totalAlerts;
@@ -20,8 +20,9 @@ class SystemHealthSummary {
   bool get hasRiskSignals => unresolvedAlerts > 0 || errorSyncs > 0;
 
   String get statusLabel {
-    if (hasRiskSignals) return 'Necesita revisión';
+    if (hasRiskSignals) return 'Necesita revisiÃ³n';
     if (totalSyncs == 0) return 'Sin actividad';
     return 'Correcto';
   }
 }
+

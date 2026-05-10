@@ -1,4 +1,4 @@
-import '../../domain/entities/remote_file.dart';
+﻿import '../../domain/entities/remote_file.dart';
 
 class RemoteFileMapper {
   static RemoteFile fromMap(Map<String, dynamic> map, String parentPath) {
@@ -18,3 +18,6 @@ class RemoteFileMapper {
     );
   }
 }
+
+
+

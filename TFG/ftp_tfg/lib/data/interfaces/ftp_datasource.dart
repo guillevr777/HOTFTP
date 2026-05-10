@@ -27,3 +27,4 @@
   );
   Future<bool> testConnection(Map<String, dynamic> profile);
 }
+

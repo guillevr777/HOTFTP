@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../domain/entities/system_alert.dart';
 import '../../domain/entities/file_version.dart';
@@ -8,27 +8,55 @@ import '../../domain/entities/system_health_summary.dart';
 import '../../domain/entities/system_recommendation.dart';
 import '../../domain/entities/system_usage_stats.dart';
 import '../../domain/entities/sync_record.dart';
-import '../../domain/repositories/ftp_repository.dart';
-import '../../domain/repositories/monitoring_repository.dart';
-import '../../domain/usecases/build_system_health_report.dart';
-import '../../domain/usecases/generate_system_recommendations.dart';
-import '../../domain/usecases/analyze_system_usage.dart';
 import '../../core/services/health_report_export_service.dart';
+import '../../domain/interfaces/i_acknowledge_alert_use_case.dart';
+import '../../domain/interfaces/i_analyze_system_usage_use_case.dart';
+import '../../domain/interfaces/i_build_system_health_report_use_case.dart';
+import '../../domain/interfaces/i_generate_system_recommendations_use_case.dart';
+import '../../domain/interfaces/i_get_active_alerts_use_case.dart';
+import '../../domain/interfaces/i_get_health_summary_use_case.dart';
+import '../../domain/interfaces/i_get_profiles_use_case.dart';
+import '../../domain/interfaces/i_get_recent_events_use_case.dart';
+import '../../domain/interfaces/i_get_recent_file_versions_use_case.dart';
+import '../../domain/interfaces/i_get_recent_syncs_use_case.dart';
 
 class SystemHealthViewModel extends ChangeNotifier {
-  final MonitoringRepository repository;
-  final FtpRepository ftpRepository;
+  final IGetHealthSummaryUseCase _getHealthSummary;
+  final IGetRecentEventsUseCase _getRecentEvents;
+  final IGetActiveAlertsUseCase _getActiveAlerts;
+  final IGetRecentSyncsUseCase _getRecentSyncs;
+  final IGetRecentFileVersionsUseCase _getRecentFileVersions;
+  final IGetProfilesUseCase _getProfiles;
+  final IAcknowledgeAlertUseCase _acknowledgeAlert;
   final String ownerId;
-  final BuildSystemHealthReport _buildSystemHealthReport =
-      const BuildSystemHealthReport();
+  final IBuildSystemHealthReportUseCase _buildSystemHealthReport;
   final HealthReportExportService _exportService =
       const HealthReportExportService();
+  final IGenerateSystemRecommendationsUseCase _generateRecommendations;
+  final IAnalyzeSystemUsageUseCase _analyzeSystemUsage;
 
   SystemHealthViewModel({
-    required this.repository,
-    required this.ftpRepository,
+    required IGetHealthSummaryUseCase getHealthSummary,
+    required IGetRecentEventsUseCase getRecentEvents,
+    required IGetActiveAlertsUseCase getActiveAlerts,
+    required IGetRecentSyncsUseCase getRecentSyncs,
+    required IGetRecentFileVersionsUseCase getRecentFileVersions,
+    required IGetProfilesUseCase getProfiles,
+    required IAcknowledgeAlertUseCase acknowledgeAlert,
     required this.ownerId,
-  });
+    required IBuildSystemHealthReportUseCase buildSystemHealthReport,
+    required IGenerateSystemRecommendationsUseCase generateSystemRecommendations,
+    required IAnalyzeSystemUsageUseCase analyzeSystemUsage,
+  })  : _getHealthSummary = getHealthSummary,
+        _getRecentEvents = getRecentEvents,
+        _getActiveAlerts = getActiveAlerts,
+        _getRecentSyncs = getRecentSyncs,
+        _getRecentFileVersions = getRecentFileVersions,
+        _getProfiles = getProfiles,
+        _acknowledgeAlert = acknowledgeAlert,
+        _buildSystemHealthReport = buildSystemHealthReport,
+        _generateRecommendations = generateSystemRecommendations,
+        _analyzeSystemUsage = analyzeSystemUsage;
 
   SystemHealthSummary? summary;
   List<SystemEvent> recentEvents = [];
@@ -40,22 +68,18 @@ class SystemHealthViewModel extends ChangeNotifier {
   bool isLoading = false;
   String? error;
   String? lastExportPath;
-  final GenerateSystemRecommendations _generateRecommendations =
-      const GenerateSystemRecommendations();
-  final AnalyzeSystemUsage _analyzeSystemUsage = const AnalyzeSystemUsage();
-
   Future<void> load() async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
       final results = await Future.wait([
-        repository.getHealthSummary(ownerId),
-        repository.getRecentEvents(ownerId, limit: 15),
-        repository.getActiveAlerts(ownerId, limit: 10),
-        repository.getRecentSyncs(ownerId, limit: 20),
-        repository.getRecentFileVersions(ownerId, limit: 12),
-        ftpRepository.getProfiles(ownerId),
+        _getHealthSummary.execute(ownerId),
+        _getRecentEvents.execute(ownerId, limit: 15),
+        _getActiveAlerts.execute(ownerId, limit: 10),
+        _getRecentSyncs.execute(ownerId, limit: 20),
+        _getRecentFileVersions.execute(ownerId, limit: 12),
+        _getProfiles.execute(ownerId),
       ]);
       summary = results[0] as SystemHealthSummary;
       recentEvents = results[1] as List<SystemEvent>;
@@ -82,7 +106,7 @@ class SystemHealthViewModel extends ChangeNotifier {
 
   Future<void> acknowledgeAlert(SystemAlert alert) async {
     if (alert.id == null) return;
-    await repository.acknowledgeAlert(alert.id!, ownerId);
+    await _acknowledgeAlert.execute(alert.id!, ownerId);
     await load();
   }
 
@@ -123,3 +147,7 @@ class SystemHealthViewModel extends ChangeNotifier {
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
+
+
+
+

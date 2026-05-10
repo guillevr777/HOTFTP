@@ -1,28 +1,28 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/app_user.dart';
-import '../../domain/usecases/auth/login_user.dart';
-import '../../domain/usecases/auth/logout_user.dart';
-import '../../domain/usecases/auth/observe_auth_state.dart';
-import '../../domain/usecases/auth/link_email_password.dart';
-import '../../domain/usecases/auth/request_password_reset.dart';
-import '../../domain/usecases/auth/register_user.dart';
-import '../../domain/usecases/auth/restore_session.dart';
-import '../../domain/usecases/auth/sign_in_with_google.dart';
-import '../../domain/usecases/auth/update_display_name.dart';
+import '../../domain/interfaces/i_link_email_password_use_case.dart';
+import '../../domain/interfaces/i_login_user_use_case.dart';
+import '../../domain/interfaces/i_logout_user_use_case.dart';
+import '../../domain/interfaces/i_observe_auth_state_use_case.dart';
+import '../../domain/interfaces/i_register_user_use_case.dart';
+import '../../domain/interfaces/i_request_password_reset_use_case.dart';
+import '../../domain/interfaces/i_restore_session_use_case.dart';
+import '../../domain/interfaces/i_sign_in_with_google_use_case.dart';
+import '../../domain/interfaces/i_update_display_name_use_case.dart';
 
 class AuthViewModel extends ChangeNotifier {
-  final LoginUser loginUser;
-  final RegisterUser registerUser;
-  final SignInWithGoogle signInWithGoogle;
-  final LogoutUser logoutUser;
-  final RestoreSession restoreSession;
-  final ObserveAuthState observeAuthState;
-  final LinkEmailPassword linkEmailPassword;
-  final RequestPasswordReset requestPasswordReset;
-  final UpdateDisplayName updateDisplayName;
+  final ILoginUserUseCase loginUser;
+  final IRegisterUserUseCase registerUser;
+  final ISignInWithGoogleUseCase signInWithGoogle;
+  final ILogoutUserUseCase logoutUser;
+  final IRestoreSessionUseCase restoreSession;
+  final IObserveAuthStateUseCase observeAuthState;
+  final ILinkEmailPasswordUseCase linkEmailPassword;
+  final IRequestPasswordResetUseCase requestPasswordReset;
+  final IUpdateDisplayNameUseCase updateDisplayName;
 
   AuthViewModel({
     required this.loginUser,
@@ -178,25 +178,25 @@ class AuthViewModel extends ChangeNotifier {
         final details = message.split('] ').last;
         switch (details) {
           case 'provider-already-linked':
-            return 'La cuenta ya tiene este método de acceso vinculado.';
+            return 'La cuenta ya tiene este mÃ©todo de acceso vinculado.';
           case 'missing-email':
-            return 'La cuenta actual no tiene un correo válido para enlazar.';
+            return 'La cuenta actual no tiene un correo vÃ¡lido para enlazar.';
           case 'credential-already-in-use':
             return 'Ese correo ya pertenece a otra cuenta.';
           case 'email-already-in-use':
-            return 'Ese correo ya está registrado.';
+            return 'Ese correo ya estÃ¡ registrado.';
           case 'invalid-email':
-            return 'El correo no tiene un formato válido.';
+            return 'El correo no tiene un formato vÃ¡lido.';
           case 'weak-password':
-            return 'La contraseña es demasiado débil.';
+            return 'La contraseÃ±a es demasiado dÃ©bil.';
           case 'requires-recent-login':
-            return 'Vuelve a iniciar sesión para completar esta acción.';
+            return 'Vuelve a iniciar sesiÃ³n para completar esta acciÃ³n.';
           case 'no-password-provider-linked':
-            return 'Esta cuenta usa Google y aún no tiene una contraseña vinculada.';
+            return 'Esta cuenta usa Google y aÃºn no tiene una contraseÃ±a vinculada.';
           case 'user-not-found':
             return 'No existe ninguna cuenta asociada a ese correo.';
           case 'network-request-failed':
-            return 'No se pudo comprobar el acceso de la cuenta. Revisa la conexión e inténtalo de nuevo.';
+            return 'No se pudo comprobar el acceso de la cuenta. Revisa la conexiÃ³n e intÃ©ntalo de nuevo.';
           default:
             return details;
         }
@@ -212,3 +212,7 @@ class AuthViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
+
+
+
+

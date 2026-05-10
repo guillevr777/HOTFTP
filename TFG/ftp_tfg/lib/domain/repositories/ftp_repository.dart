@@ -1,4 +1,4 @@
-import '../entities/ftp_profile.dart';
+﻿import '../entities/ftp_profile.dart';
 import '../entities/dump_schedule.dart';
 import '../entities/local_file.dart';
 import '../entities/remote_file.dart';
@@ -45,3 +45,6 @@ abstract class FtpRepository {
   Future<int> saveDumpSchedule(DumpSchedule schedule);
   Future<void> deleteDumpSchedule(int id, String ownerId);
 }
+
+
+

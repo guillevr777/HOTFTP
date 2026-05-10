@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../../core/services/dump_transfer_service.dart';
@@ -8,23 +8,46 @@ import '../../domain/entities/system_alert.dart';
 import '../../domain/entities/system_event.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
-import '../../domain/repositories/ftp_repository.dart';
-import '../../domain/repositories/monitoring_repository.dart';
-import '../../domain/usecases/evaluate_sync_rules.dart';
+import '../../domain/interfaces/i_create_alert_use_case.dart';
+import '../../domain/interfaces/i_detect_conflicts_use_case.dart';
+import '../../domain/interfaces/i_evaluate_sync_rules_use_case.dart';
+import '../../domain/interfaces/i_get_active_alerts_use_case.dart';
+import '../../domain/interfaces/i_get_sync_history_use_case.dart';
+import '../../domain/interfaces/i_record_event_use_case.dart';
+import '../../domain/interfaces/i_save_sync_record_use_case.dart';
 
 enum SyncMode { push, pull, bidirectional }
 
 class SyncViewModel extends ChangeNotifier {
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
+  final IDetectConflictsUseCase _detectConflicts;
+  final ISaveSyncRecordUseCase _saveSyncRecord;
+  final IGetSyncHistoryUseCase _getSyncHistory;
+  final IGetActiveAlertsUseCase _getActiveAlerts;
+  final IEvaluateSyncRulesUseCase _evaluateSyncRules;
+  final IRecordEventUseCase _recordEvent;
+  final ICreateAlertUseCase _createAlert;
   final FtpProfile profile;
   final String ownerId;
+  final DumpTransferService transferService;
+
   SyncViewModel({
-    required this.repository,
-    required this.monitoringRepository,
+    required IDetectConflictsUseCase detectConflicts,
+    required ISaveSyncRecordUseCase saveSyncRecord,
+    required IGetSyncHistoryUseCase getSyncHistory,
+    required IGetActiveAlertsUseCase getActiveAlerts,
+    required IEvaluateSyncRulesUseCase evaluateSyncRules,
+    required IRecordEventUseCase recordEvent,
+    required ICreateAlertUseCase createAlert,
     required this.profile,
     required this.ownerId,
-  });
+    required this.transferService,
+  })  : _detectConflicts = detectConflicts,
+        _saveSyncRecord = saveSyncRecord,
+        _getSyncHistory = getSyncHistory,
+        _getActiveAlerts = getActiveAlerts,
+        _evaluateSyncRules = evaluateSyncRules,
+        _recordEvent = recordEvent,
+        _createAlert = createAlert;
 
   SyncMode syncMode = SyncMode.bidirectional;
   String localPath = '/storage/emulated/0/Download';
@@ -36,7 +59,6 @@ class SyncViewModel extends ChangeNotifier {
   String? error;
   List<SyncConflict> conflicts = [];
   List<SyncRecord> history = [];
-  final EvaluateSyncRules _evaluateSyncRules = const EvaluateSyncRules();
 
   void setSyncMode(SyncMode mode) {
     syncMode = mode;
@@ -73,21 +95,17 @@ class SyncViewModel extends ChangeNotifier {
       await _trackEvent(
         eventType: 'sync_started',
         severity: SystemEventSeverity.info,
-        title: 'Sincronización iniciada',
-        message: 'Se ha iniciado la sincronización manual.',
+        title: 'SincronizaciÃ³n iniciada',
+        message: 'Se ha iniciado la sincronizaciÃ³n manual.',
       );
-      conflicts = await repository.detectConflicts(
-        localPath,
-        remotePath,
-        profile,
-      );
+      conflicts = await _detectConflicts.execute(localPath, remotePath, profile);
       final transferMode = syncMode == SyncMode.bidirectional
           ? DumpTransferMode.syncBoth
           : DumpTransferMode.oneWay;
       final sourceSide = syncMode == SyncMode.pull
           ? DumpSourceSide.remote
           : DumpSourceSide.local;
-      final result = await DumpTransferService(repository).execute(
+      final result = await transferService.execute(
         profile: profile,
         localPath: localPath.isEmpty
             ? '/storage/emulated/0/Download'
@@ -99,7 +117,7 @@ class SyncViewModel extends ChangeNotifier {
       );
       filesTransferred = result.transferred;
       filesSkipped = result.skipped;
-      await repository.saveSyncRecord(
+      await _saveSyncRecord.execute(
         SyncRecord(
           ownerId: ownerId,
           profileId: profile.id ?? 0,
@@ -115,7 +133,7 @@ class SyncViewModel extends ChangeNotifier {
       await _trackEvent(
         eventType: 'sync_completed',
         severity: SystemEventSeverity.success,
-        title: 'Sincronización completada',
+        title: 'SincronizaciÃ³n completada',
         message:
             'Se han transferido $filesTransferred archivos y se han omitido $filesSkipped.',
       );
@@ -125,13 +143,13 @@ class SyncViewModel extends ChangeNotifier {
       await _trackEvent(
         eventType: 'sync_failed',
         severity: SystemEventSeverity.error,
-        title: 'Error de sincronización',
+        title: 'Error de sincronizaciÃ³n',
         message: error!,
       );
       await _trackAlert(
         source: 'sync',
         severity: SystemAlertSeverity.error,
-        title: 'Sincronización con error',
+        title: 'SincronizaciÃ³n con error',
         message: error!,
       );
       await _applyAutomaticRules();
@@ -141,7 +159,7 @@ class SyncViewModel extends ChangeNotifier {
   }
 
   Future<void> loadHistory() async {
-    history = await repository.getSyncHistory(ownerId);
+    history = await _getSyncHistory.execute(ownerId);
     notifyListeners();
   }
 
@@ -152,7 +170,7 @@ class SyncViewModel extends ChangeNotifier {
     required String message,
   }) async {
     try {
-      await monitoringRepository.recordEvent(
+      await _recordEvent.execute(
         SystemEvent(
           ownerId: ownerId,
           eventType: eventType,
@@ -164,7 +182,7 @@ class SyncViewModel extends ChangeNotifier {
         ),
       );
     } catch (_) {
-      // La monitorización nunca debe bloquear la sincronización.
+      // La monitorizaciÃ³n nunca debe bloquear la sincronizaciÃ³n.
     }
   }
 
@@ -175,7 +193,7 @@ class SyncViewModel extends ChangeNotifier {
     required String message,
   }) async {
     try {
-      await monitoringRepository.createAlert(
+      await _createAlert.execute(
         SystemAlert(
           ownerId: ownerId,
           source: source,
@@ -193,11 +211,8 @@ class SyncViewModel extends ChangeNotifier {
 
   Future<void> _applyAutomaticRules() async {
     try {
-      final recentSyncs = await repository.getSyncHistory(ownerId);
-      final activeAlerts = await monitoringRepository.getActiveAlerts(
-        ownerId,
-        limit: 20,
-      );
+      final recentSyncs = await _getSyncHistory.execute(ownerId);
+      final activeAlerts = await _getActiveAlerts.execute(ownerId, limit: 20);
       final alerts = _evaluateSyncRules.execute(
         ownerId: ownerId,
         profileId: profile.id ?? 0,
@@ -206,10 +221,14 @@ class SyncViewModel extends ChangeNotifier {
         activeAlerts: activeAlerts,
       );
       for (final alert in alerts) {
-        await monitoringRepository.createAlert(alert);
+        await _createAlert.execute(alert);
       }
     } catch (_) {
-      // Las reglas automáticas no deben romper la sincronización manual.
+      // Las reglas automÃ¡ticas no deben romper la sincronizaciÃ³n manual.
     }
   }
 }
+
+
+
+

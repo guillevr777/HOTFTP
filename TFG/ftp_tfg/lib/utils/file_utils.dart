@@ -1,4 +1,4 @@
-class FileUtils {
+﻿class FileUtils {
   static const imageExtensions = {
     'jpg',
     'jpeg',
@@ -72,3 +72,4 @@ class FileUtils {
     return 'Otro';
   }
 }
+

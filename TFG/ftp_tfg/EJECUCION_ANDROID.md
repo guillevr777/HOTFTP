@@ -1,20 +1,20 @@
-# Ejecuci�n del proyecto en Android
+# Ejecucion del proyecto en Android
 
 ## Estado actual
 
-La app qued� abierta correctamente en el emulador Android `Pixel_9a` (`emulator-5554`).
+La app quedo abierta correctamente en el emulador Android `Pixel_9a` (`emulator-5554`).
 
 ## Resumen
 
-1. Se comprob� que el proyecto es Flutter.
+1. Se comprobo que el proyecto es Flutter.
 2. Se listaron los dispositivos disponibles.
-3. Se lanz� el emulador `Pixel_9a`.
-4. Se esper� a que `adb` lo detectara como `device`.
-5. Se ejecut� la app con `flutter run -d emulator-5554 --dart-define=HOTFTP_USE_FAKE_FTP=true`.
+3. Se lanzo el emulador `Pixel_9a`.
+4. Se espero a que `adb` lo detectara como `device`.
+5. Se ejecuto la app con `flutter run -d emulator-5554 --dart-define=HOTFTP_USE_FAKE_FTP=true`.
 
 ## Resultado
 
-La compilaci�n e instalaci�n terminaron bien y la app se abri� en el emulador.
+La compilacion e instalacion terminaron bien y la app se abrio en el emulador.
 
 ## Comando usado
 
@@ -24,5 +24,12 @@ flutter run -d emulator-5554 --dart-define=HOTFTP_USE_FAKE_FTP=true
 
 ## Notas
 
-- Se us� `Pixel_9a` porque ofrece mas margen de memoria que el emulador pequeno.
+- Se uso `Pixel_9a` porque ofrece mas margen de memoria que el emulador pequeno.
 - El proceso de `flutter run` quedo en segundo plano, asi que la app sigue disponible en el emulador.
+
+## Credenciales de desarrollo
+
+Estas credenciales se dejan aqui solo como referencia local para pruebas.
+
+- Firebase: `guillevr7@gmail.com` / `Pepapig7`
+- FTPServer: `127.0.0.1` / `8700` / `Guill` / `123`

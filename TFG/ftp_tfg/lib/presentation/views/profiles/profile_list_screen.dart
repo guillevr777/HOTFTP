@@ -1,26 +1,20 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
-import '../../../domain/repositories/ftp_repository.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../viewmodels/auth_viewmodel.dart';
-import '../../viewmodels/profile_viewmodel.dart';
+import '../../viewmodels/auth_view_model.dart';
+import '../../viewmodels/profile_view_model.dart';
 import '../auth/account_screen.dart';
 import '../browser/remote_browser_screen.dart';
 import '../monitoring/health_center_screen.dart';
 import 'profile_form_screen.dart';
 
 class ProfileListScreen extends StatefulWidget {
-  final FtpRepository ftpRepository;
-  final MonitoringRepository monitoringRepository;
   final String ownerId;
 
   const ProfileListScreen({
     super.key,
-    required this.ftpRepository,
-    required this.monitoringRepository,
     required this.ownerId,
   });
 
@@ -78,16 +72,12 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => HealthCenterScreen(
-                  repository: widget.monitoringRepository,
-                  ftpRepository: widget.ftpRepository,
-                  ownerId: widget.ownerId,
-                ),
+                builder: (_) => HealthCenterScreen(ownerId: widget.ownerId),
               ),
             ),
           ),
           IconButton(
-            tooltip: 'Cerrar sesión',
+            tooltip: 'Cerrar sesiÃ³n',
             icon: const Icon(Icons.logout),
             onPressed: authVm.isLoading
                 ? null
@@ -176,9 +166,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
       MaterialPageRoute(
         builder: (_) => RemoteBrowserScreen(
           profile: profile,
-          repository: widget.ftpRepository,
           ownerId: widget.ownerId,
-          monitoringRepository: widget.monitoringRepository,
         ),
       ),
     );
@@ -259,7 +247,7 @@ class _ProfileCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${profile.host}:${profile.port}',
+                        profile.host,
                         style: const TextStyle(
                           color: AppTheme.onSurfaceMuted,
                           fontSize: 13,
@@ -268,43 +256,26 @@ class _ProfileCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (profile.useFTPS)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.success.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'FTPS',
-                      style: TextStyle(color: AppTheme.success, fontSize: 11),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: onConnect,
-                    icon: const Icon(Icons.link, size: 18),
-                    label: const Text('Conectar'),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Abrir'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
-                  tooltip: 'Editar',
                 ),
                 IconButton(
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline, color: AppTheme.error),
-                  tooltip: 'Eliminar',
                 ),
               ],
             ),
@@ -314,3 +285,6 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 }
+
+
+

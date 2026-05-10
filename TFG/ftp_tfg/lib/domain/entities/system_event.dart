@@ -1,4 +1,4 @@
-enum SystemEventSeverity { info, success, warning, error }
+﻿enum SystemEventSeverity { info, success, warning, error }
 
 class SystemEvent {
   final int? id;
@@ -51,3 +51,4 @@ class SystemEvent {
             DateTime.fromMillisecondsSinceEpoch(0),
       );
 }
+

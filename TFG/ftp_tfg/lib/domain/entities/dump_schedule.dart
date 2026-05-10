@@ -1,4 +1,4 @@
-enum DumpSourceSide { local, remote }
+﻿enum DumpSourceSide { local, remote }
 
 enum DumpTransferMode { oneWay, syncBoth }
 
@@ -121,3 +121,4 @@ class DumpSchedule {
             : DateTime.tryParse(map['nextRunAt'] as String),
       );
 }
+

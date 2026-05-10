@@ -1,45 +1,47 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:universal_io/io.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
-import '../../../domain/repositories/ftp_repository.dart';
-import '../../../domain/repositories/monitoring_repository.dart';
 import '../../../theme/app_theme.dart';
-import '../../../utils/file_utils.dart';
-import '../../viewmodels/browser_viewmodel.dart';
+import '../../viewmodels/browser_view_model.dart';
 import '../history/history_screen.dart';
 import '../sync/sync_screen.dart';
+import '../../../domain/interfaces/i_download_file_use_case.dart';
+import '../../../domain/interfaces/i_download_thumbnail_use_case.dart';
+import '../../../domain/interfaces/i_get_latest_file_version_use_case.dart';
+import '../../../domain/interfaces/i_get_local_files_use_case.dart';
+import '../../../domain/interfaces/i_get_remote_files_use_case.dart';
+import '../../../domain/interfaces/i_record_file_version_use_case.dart';
+import '../../../domain/interfaces/i_upload_file_use_case.dart';
 
 class RemoteBrowserScreen extends StatelessWidget {
   final FtpProfile profile;
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
   final String ownerId;
 
   const RemoteBrowserScreen({
     super.key,
     required this.profile,
-    required this.repository,
-    required this.monitoringRepository,
     required this.ownerId,
   });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => BrowserViewModel(
-        repository: repository,
-        monitoringRepository: monitoringRepository,
+      create: (context) => BrowserViewModel(
+        getRemoteFiles: context.read<IGetRemoteFilesUseCase>(),
+        getLocalFiles: context.read<IGetLocalFilesUseCase>(),
+        downloadFileUseCase: context.read<IDownloadFileUseCase>(),
+        uploadFileUseCase: context.read<IUploadFileUseCase>(),
+        downloadThumbnailUseCase: context.read<IDownloadThumbnailUseCase>(),
+        getLatestFileVersion: context.read<IGetLatestFileVersionUseCase>(),
+        recordFileVersion: context.read<IRecordFileVersionUseCase>(),
         profile: profile,
         ownerId: ownerId,
       )..loadRemoteFiles(),
       child: _RemoteBrowserBody(
         profile: profile,
-        repository: repository,
-        monitoringRepository: monitoringRepository,
         ownerId: ownerId,
       ),
     );
@@ -48,14 +50,10 @@ class RemoteBrowserScreen extends StatelessWidget {
 
 class _RemoteBrowserBody extends StatelessWidget {
   final FtpProfile profile;
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
   final String ownerId;
 
   const _RemoteBrowserBody({
     required this.profile,
-    required this.repository,
-    required this.monitoringRepository,
     required this.ownerId,
   });
 
@@ -87,8 +85,6 @@ class _RemoteBrowserBody extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => SyncScreen(
                   profile: profile,
-                  repository: repository,
-                  monitoringRepository: monitoringRepository,
                   ownerId: ownerId,
                 ),
               ),
@@ -102,8 +98,6 @@ class _RemoteBrowserBody extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => HistoryScreen(
                   profile: profile,
-                  repository: repository,
-                  monitoringRepository: monitoringRepository,
                   ownerId: ownerId,
                 ),
               ),
@@ -251,7 +245,7 @@ class _FilterBar extends StatelessWidget {
                 RemoteTypeFilter.all => 'Todo',
                 RemoteTypeFilter.folders => 'Carpetas',
                 RemoteTypeFilter.images => 'Fotos',
-                RemoteTypeFilter.videos => 'Vídeos',
+                RemoteTypeFilter.videos => 'Videos',
                 RemoteTypeFilter.documents => 'Documentos',
                 RemoteTypeFilter.archives => 'Comprimidos',
                 RemoteTypeFilter.others => 'Otros',
@@ -262,66 +256,6 @@ class _FilterBar extends StatelessWidget {
                 onSelected: (_) => vm.setTypeFilter(filter),
               );
             }).toList(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<RemoteSortField>(
-                  initialValue: vm.sortField,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: 'Ordenar por',
-                    filled: true,
-                    fillColor: AppTheme.surfaceVariant,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: RemoteSortField.name,
-                      child: Text('Nombre'),
-                    ),
-                    DropdownMenuItem(
-                      value: RemoteSortField.date,
-                      child: Text('Fecha'),
-                    ),
-                    DropdownMenuItem(
-                      value: RemoteSortField.size,
-                      child: Text('Tamaño'),
-                    ),
-                    DropdownMenuItem(
-                      value: RemoteSortField.type,
-                      child: Text('Tipo'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) vm.setSortField(value);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              IconButton.filledTonal(
-                onPressed: vm.toggleSortDirection,
-                icon: Icon(
-                  vm.sortDirection == SortDirection.asc
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
-                ),
-                tooltip: vm.sortDirection == SortDirection.asc
-                    ? 'Ascendente'
-                    : 'Descendente',
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${vm.visibleRemoteFiles.length} archivos visibles',
-            style: const TextStyle(
-              color: AppTheme.onSurfaceMuted,
-              fontSize: 12,
-            ),
           ),
         ],
       ),
@@ -338,27 +272,14 @@ class _PathBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppTheme.surfaceVariant,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_upward, size: 18),
             onPressed: onGoUp,
-            tooltip: 'Subir nivel',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.arrow_upward),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              path,
-              style: const TextStyle(
-                color: AppTheme.onSurfaceMuted,
-                fontSize: 13,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          Expanded(child: Text(path)),
         ],
       ),
     );
@@ -373,75 +294,25 @@ class _FileListTile extends StatelessWidget {
   const _FileListTile({
     required this.file,
     required this.onTap,
-    this.onDownload,
+    required this.onDownload,
   });
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<BrowserViewModel>();
-    final thumbnailPath = vm.thumbnails[file.path];
-
-    Widget leading;
-    if (!kIsWeb && thumbnailPath != null) {
-      leading = ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: Image.file(
-          File(thumbnailPath),
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _defaultIcon(),
-        ),
-      );
-    } else {
-      leading = _defaultIcon();
-    }
-
     return ListTile(
-      leading: SizedBox(width: 40, height: 40, child: Center(child: leading)),
+      leading: Icon(file.isDirectory ? Icons.folder : Icons.insert_drive_file),
       title: Text(file.name),
-      subtitle: file.isDirectory
-          ? const Text('Carpeta')
-          : Text(
-              '${_formatSize(file.size)} • ${FileUtils.fileCategory(file.name)}'
-              '${file.modifiedAt != null ? ' • ${vm.formatModifiedAt(file)}' : ''}',
-              style: const TextStyle(fontSize: 12),
-            ),
-      trailing: onDownload != null
-          ? IconButton(
-              icon: const Icon(
-                Icons.download_outlined,
-                color: AppTheme.primary,
-              ),
-              onPressed: onDownload,
-              tooltip: 'Descargar',
-            )
-          : const Icon(Icons.chevron_right, color: AppTheme.onSurfaceMuted),
       onTap: onTap,
+      trailing: onDownload == null
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: onDownload,
+            ),
     );
   }
-
-  Widget _defaultIcon() {
-    IconData iconData = Icons.insert_drive_file_outlined;
-    Color iconColor = AppTheme.onSurfaceMuted;
-
-    if (file.isDirectory) {
-      iconData = Icons.folder;
-      iconColor = const Color(0xFFE3B341);
-    } else if (FileUtils.isVideo(file.name)) {
-      iconData = Icons.videocam_outlined;
-      iconColor = AppTheme.primary;
-    } else if (FileUtils.isImage(file.name)) {
-      iconData = Icons.image_outlined;
-      iconColor = AppTheme.success;
-    }
-
-    return Icon(iconData, color: iconColor, size: 28);
-  }
 }
+
+
+
+

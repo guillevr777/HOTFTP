@@ -1,11 +1,16 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/remote_file.dart';
-import '../../domain/repositories/ftp_repository.dart';
-import '../../domain/repositories/monitoring_repository.dart';
 import '../../utils/file_utils.dart';
+import '../../domain/interfaces/i_download_file_use_case.dart';
+import '../../domain/interfaces/i_download_thumbnail_use_case.dart';
+import '../../domain/interfaces/i_get_latest_file_version_use_case.dart';
+import '../../domain/interfaces/i_get_local_files_use_case.dart';
+import '../../domain/interfaces/i_get_remote_files_use_case.dart';
+import '../../domain/interfaces/i_record_file_version_use_case.dart';
+import '../../domain/interfaces/i_upload_file_use_case.dart';
 
 enum RemoteSortField { name, date, size, type }
 
@@ -22,14 +27,24 @@ enum RemoteTypeFilter {
 }
 
 class BrowserViewModel extends ChangeNotifier {
-  final FtpRepository repository;
-  final MonitoringRepository monitoringRepository;
+  final IGetRemoteFilesUseCase getRemoteFiles;
+  final IGetLocalFilesUseCase getLocalFiles;
+  final IDownloadFileUseCase downloadFileUseCase;
+  final IUploadFileUseCase uploadFileUseCase;
+  final IDownloadThumbnailUseCase downloadThumbnailUseCase;
+  final IGetLatestFileVersionUseCase getLatestFileVersion;
+  final IRecordFileVersionUseCase recordFileVersion;
   final FtpProfile profile;
   final String ownerId;
 
   BrowserViewModel({
-    required this.repository,
-    required this.monitoringRepository,
+    required this.getRemoteFiles,
+    required this.getLocalFiles,
+    required this.downloadFileUseCase,
+    required this.uploadFileUseCase,
+    required this.downloadThumbnailUseCase,
+    required this.getLatestFileVersion,
+    required this.recordFileVersion,
     required this.profile,
     required this.ownerId,
   });
@@ -109,7 +124,7 @@ class BrowserViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      remoteFiles = await repository.getRemoteFiles(p, profile);
+      remoteFiles = await getRemoteFiles.execute(p, profile);
       currentRemotePath = p;
       await _trackFileVersions();
     } catch (e) {
@@ -125,7 +140,7 @@ class BrowserViewModel extends ChangeNotifier {
     isLoading = true;
     notifyListeners();
     try {
-      localFiles = await repository.getLocalFiles(p);
+      localFiles = await getLocalFiles.execute(p);
       currentLocalPath = p;
     } catch (e) {
       error = "Error al listar archivos locales: $e";
@@ -139,7 +154,7 @@ class BrowserViewModel extends ChangeNotifier {
     downloadProgress = 0;
     notifyListeners();
     try {
-      await repository.downloadFile(file, currentLocalPath, profile);
+      await downloadFileUseCase.execute(file, currentLocalPath, profile);
       downloadProgress = 1;
     } catch (e) {
       error = "Error al descargar: $e";
@@ -153,7 +168,7 @@ class BrowserViewModel extends ChangeNotifier {
     uploadProgress = 0;
     notifyListeners();
     try {
-      await repository.uploadFile(
+      await uploadFileUseCase.execute(
         "$currentLocalPath/$localFileName",
         currentRemotePath,
         profile,
@@ -176,7 +191,7 @@ class BrowserViewModel extends ChangeNotifier {
     if (profile.id == null) return;
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
       try {
-        final latest = await monitoringRepository.getLatestFileVersion(
+        final latest = await getLatestFileVersion.execute(
           ownerId,
           profile.id!,
           file.path,
@@ -188,7 +203,7 @@ class BrowserViewModel extends ChangeNotifier {
             latest.modifiedAt?.toIso8601String() !=
                 modifiedAt?.toIso8601String();
         if (!hasChanged) continue;
-        await monitoringRepository.recordFileVersion(
+        await recordFileVersion.execute(
           FileVersion(
             ownerId: ownerId,
             profileId: profile.id!,
@@ -253,7 +268,7 @@ class BrowserViewModel extends ChangeNotifier {
   Future<void> loadThumbnail(RemoteFile file, String remotePath) async {
     if (thumbnails.containsKey(file.path)) return;
     try {
-      final localPath = await repository.downloadThumbnail(
+      final localPath = await downloadThumbnailUseCase.execute(
         file,
         remotePath,
         profile,
@@ -271,3 +286,7 @@ class BrowserViewModel extends ChangeNotifier {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 }
+
+
+
+

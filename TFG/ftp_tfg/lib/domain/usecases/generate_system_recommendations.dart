@@ -1,11 +1,13 @@
-import '../entities/system_alert.dart';
+﻿import '../entities/system_alert.dart';
 import '../entities/system_health_summary.dart';
 import '../entities/system_recommendation.dart';
 import '../entities/sync_record.dart';
+import '../interfaces/i_generate_system_recommendations_use_case.dart';
 
-class GenerateSystemRecommendations {
+class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUseCase {
   const GenerateSystemRecommendations();
 
+  @override
   List<SystemRecommendation> execute({
     required SystemHealthSummary summary,
     required List<SystemAlert> activeAlerts,
@@ -29,7 +31,7 @@ class GenerateSystemRecommendations {
         const SystemRecommendation(
           title: 'Analizar fallos repetidos',
           message:
-              'Se detectan varios errores de sincronización. Revisa credenciales, conectividad y permisos del servidor.',
+              'Se detectan varios errores de sincronizaciÃ³n. Revisa credenciales, conectividad y permisos del servidor.',
           kind: SystemRecommendationKind.warning,
         ),
       );
@@ -38,9 +40,9 @@ class GenerateSystemRecommendations {
     if (summary.lastSyncAt == null) {
       recommendations.add(
         const SystemRecommendation(
-          title: 'Configurar la primera sincronización',
+          title: 'Configurar la primera sincronizaciÃ³n',
           message:
-              'Aún no hay sincronizaciones registradas. Crear una tarea automática te permitirá empezar a generar histórico útil.',
+              'AÃºn no hay sincronizaciones registradas. Crear una tarea automÃ¡tica te permitirÃ¡ empezar a generar histÃ³rico Ãºtil.',
           kind: SystemRecommendationKind.action,
         ),
       );
@@ -50,9 +52,9 @@ class GenerateSystemRecommendations {
       if (hoursSinceLastSync >= 24) {
         recommendations.add(
           SystemRecommendation(
-            title: 'Programar una sincronización',
+            title: 'Programar una sincronizaciÃ³n',
             message:
-                'La última sincronización fue hace $hoursSinceLastSync horas. Una tarea recurrente reduciría el riesgo de desactualización.',
+                'La Ãºltima sincronizaciÃ³n fue hace $hoursSinceLastSync horas. Una tarea recurrente reducirÃ­a el riesgo de desactualizaciÃ³n.',
             kind: SystemRecommendationKind.warning,
           ),
         );
@@ -70,7 +72,7 @@ class GenerateSystemRecommendations {
         SystemRecommendation(
           title: 'Ventana recomendada de backups',
           message:
-              'Tus sincronizaciones exitosas suelen concentrarse alrededor de las ${averageHour.toString().padLeft(2, '0')}:00. Esa podría ser una buena franja para automatizar backups.',
+              'Tus sincronizaciones exitosas suelen concentrarse alrededor de las ${averageHour.toString().padLeft(2, '0')}:00. Esa podrÃ­a ser una buena franja para automatizar backups.',
           kind: SystemRecommendationKind.positive,
         ),
       );
@@ -92,7 +94,7 @@ class GenerateSystemRecommendations {
         const SystemRecommendation(
           title: 'Seguir monitorizando',
           message:
-              'Todavía no hay suficiente actividad para generar recomendaciones precisas. Continúa usando la app para mejorar la predicción.',
+              'TodavÃ­a no hay suficiente actividad para generar recomendaciones precisas. ContinÃºa usando la app para mejorar la predicciÃ³n.',
           kind: SystemRecommendationKind.warning,
         ),
       );
@@ -101,3 +103,7 @@ class GenerateSystemRecommendations {
     return recommendations;
   }
 }
+
+
+
+
