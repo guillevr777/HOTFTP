@@ -113,3 +113,8 @@ Esto permite trabajar offline y mantener un centro de salud interno del sistema.
 ## Estado
 
 El objetivo del proyecto es servir como base de un gestor FTP profesional, defendible en TFG y facil de extender con nuevas reglas, paneles y automatizaciones.
+
+## Monorepo
+
+Este repositorio tambien incluye el backend en [`hotftp_api`](hotftp_api/README.md).
+La API es un proyecto Node.js/TypeScript separado, pensado para desplegarse en Render y para que Flutter consuma HTTP en lugar de FTP directo.
