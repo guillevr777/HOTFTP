@@ -109,6 +109,16 @@ export class PostgresProfileRepository implements ProfileRepository {
     return result.rows[0] ? this.toDomain(result.rows[0]) : null;
   }
 
+  async delete(ownerId: string, id: number): Promise<void> {
+    await this.database.query(
+      `
+      DELETE FROM ftp_profiles
+      WHERE owner_id = $1 AND id = $2
+      `,
+      [ownerId, id],
+    );
+  }
+
   private toDomain(row: FtpProfileRow): FtpProfile {
     return {
       id: row.id,

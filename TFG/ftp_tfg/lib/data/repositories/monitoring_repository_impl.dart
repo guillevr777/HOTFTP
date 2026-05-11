@@ -12,6 +12,9 @@ class MonitoringRepositoryImpl implements MonitoringRepository {
   MonitoringRepositoryImpl();
 
   @override
+  Future<void> recordSync(SyncRecord record) => _db.insertSyncRecord(record);
+
+  @override
   Future<void> recordEvent(SystemEvent event) => _db.insertSystemEvent(event);
 
   @override
@@ -32,6 +35,10 @@ class MonitoringRepositoryImpl implements MonitoringRepository {
   @override
   Future<List<SyncRecord>> getRecentSyncs(String ownerId, {int limit = 20}) =>
       _db.getRecentSyncs(ownerId, limit: limit);
+
+  @override
+  Future<List<SyncRecord>> getSyncHistory(String ownerId) =>
+      _db.getSyncHistory(ownerId);
 
   @override
   Future<List<FileVersion>> getRecentFileVersions(

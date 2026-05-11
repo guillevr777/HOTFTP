@@ -5,12 +5,14 @@ import '../entities/system_health_summary.dart';
 import '../entities/sync_record.dart';
 
 abstract class MonitoringRepository {
+  Future<void> recordSync(SyncRecord record);
   Future<void> recordEvent(SystemEvent event);
   Future<int> createAlert(SystemAlert alert);
   Future<int> recordFileVersion(FileVersion version);
   Future<List<SystemEvent>> getRecentEvents(String ownerId, {int limit = 20});
   Future<List<SystemAlert>> getActiveAlerts(String ownerId, {int limit = 10});
   Future<List<SyncRecord>> getRecentSyncs(String ownerId, {int limit = 20});
+  Future<List<SyncRecord>> getSyncHistory(String ownerId);
   Future<List<FileVersion>> getRecentFileVersions(
     String ownerId, {
     int limit = 12,

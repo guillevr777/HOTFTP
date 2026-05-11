@@ -96,7 +96,7 @@ class DumpSchedule {
         id: map['id'] as int?,
         ownerId: map['ownerId'] as String? ?? '',
         profileId: map['profileId'] as int,
-        enabled: map['enabled'] == 1,
+        enabled: map['enabled'] == true || map['enabled'] == 1,
         localPath: map['localPath'] as String? ?? '',
         remotePath: map['remotePath'] as String? ?? '/',
         sourceSide: DumpSourceSide.values.firstWhere(
@@ -107,7 +107,9 @@ class DumpSchedule {
           (value) => value.name == map['transferMode'],
           orElse: () => DumpTransferMode.oneWay,
         ),
-        deleteSourceAfterCopy: map['deleteSourceAfterCopy'] == 1,
+        deleteSourceAfterCopy:
+            map['deleteSourceAfterCopy'] == true ||
+            map['deleteSourceAfterCopy'] == 1,
         intervalValue: map['intervalValue'] as int? ?? 24,
         intervalUnit: DumpIntervalUnit.values.firstWhere(
           (value) => value.name == map['intervalUnit'],

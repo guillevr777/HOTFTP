@@ -19,7 +19,7 @@ Web sigue necesitando un ultimo pase de compatibilidad para eliminar dependencia
 - Recuperacion de contraseña.
 - Gestion de perfiles FTP.
 - Navegacion y listado de ficheros remotos.
-- Sincronizacion manual y tareas programadas.
+- Sincronizacion manual y tareas programadas con definicion persistida en la API.
 - Centro de salud con:
   - alertas
   - eventos
@@ -39,7 +39,7 @@ El proyecto sigue una organizacion inspirada en Clean Architecture:
 - `lib/data`
   - datasources
   - repositorios concretos
-  - persistencia local SQLite
+- persistencia local SQLite para cache y soporte de compatibilidad
 - `lib/presentation`
   - viewmodels
   - pantallas
@@ -61,7 +61,8 @@ La idea es mantener las dependencias apuntando hacia dentro:
 - Firebase Auth
 - Google Sign-In
 - SQLite con `sqflite`
-- FTP con `ftpconnect`
+- HTTP contra la API propia
+- FTP solo en el backend Node.js
 
 ## Requisitos
 
@@ -95,20 +96,19 @@ Si quieres lanzar especificamente Android, consulta [EJECUCION_ANDROID.md](EJECU
 La base de datos local se usa para guardar:
 
 - perfiles FTP
-- historico de sincronizaciones
-- tareas programadas
-- alertas
-- eventos del sistema
-- estadisticas y versionado
+- caché local y metadatos temporales
+- historico tecnico local auxiliar
 
 Esto permite trabajar offline y mantener un centro de salud interno del sistema.
 
 ## Notas de desarrollo
 
 - El proyecto esta pensado para que cada responsabilidad viva en su capa.
-- La monitorizacion y el versionado no bloquean la sincronizacion.
+- La monitorizacion, el versionado y el historial de sync viven en la API.
+- Las tareas programadas se guardan y se consultan por HTTP; la ejecucion local sigue existiendo porque necesita acceso al sistema de archivos del dispositivo.
 - Las reglas automaticas crean alertas cuando detectan patrones problematicos.
 - Los archivos temporales de ejecucion y caches locales se ignoran en `.gitignore`.
+- La app ya no habla con FTP directo en el flujo principal; consume la API en HTTP.
 
 ## Estado
 
@@ -118,3 +118,22 @@ El objetivo del proyecto es servir como base de un gestor FTP profesional, defen
 
 Este repositorio tambien incluye el backend en [`hotftp_api`](hotftp_api/README.md).
 La API es un proyecto Node.js/TypeScript separado, pensado para desplegarse en Render y para que Flutter consuma HTTP en lugar de FTP directo.
+
+## Conexion con la API
+
+Por defecto Flutter apunta a la API publica de Render:
+
+```bash
+flutter run --dart-define=HOTFTP_API_BASE_URL=https://hotftp-api.onrender.com
+```
+
+Si quieres usar una API local, cambia la URL:
+
+```bash
+flutter run --dart-define=HOTFTP_API_BASE_URL=http://127.0.0.1:3000
+```
+
+## Estado de las tareas programadas
+
+La definicion de las tareas programadas se guarda ahora en la API.
+Flutter sigue ejecutando el proceso recurrente cuando la app esta viva, porque necesita acceso a las rutas locales del dispositivo.

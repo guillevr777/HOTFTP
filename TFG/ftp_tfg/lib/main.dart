@@ -35,11 +35,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'HOTFTP',
         theme: AppTheme.dark,
-        home: AuthGate(
-          ftpRepository: dependencies.ftpRepository,
-          monitoringRepository: dependencies.monitoringRepository,
-          evaluateSyncRules: dependencies.evaluateSyncRules,
-        ),
+        home: const AuthGate(),
       ),
     );
   }

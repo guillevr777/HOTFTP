@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_io/io.dart';
@@ -10,18 +10,21 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
-import '../interfaces/ftp_datasource.dart';
 import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
+import '../datasources/hotftp_api_client.dart';
 
-class FtpRepositoryImpl implements FtpRepository {
-  final FtpDatasource datasource;
+class ApiFtpRepositoryImpl implements FtpRepository {
+  final HotftpApiClient client;
   final DatabaseHelper _db = DatabaseHelper.instance;
 
-  FtpRepositoryImpl(this.datasource);
+  ApiFtpRepositoryImpl(this.client);
 
-  Map<String, dynamic> _getConfig(FtpProfile profile) {
+  Map<String, dynamic> _profilePayload(FtpProfile profile, String ownerId) {
     return {
+      'id': profile.id,
+      'ownerId': ownerId,
+      'name': profile.name,
       'host': profile.host,
       'port': profile.port,
       'username': profile.username,
@@ -31,13 +34,23 @@ class FtpRepositoryImpl implements FtpRepository {
     };
   }
 
+  String _ownerIdFor(FtpProfile profile) {
+    final ownerId = profile.ownerId;
+    if (ownerId == null || ownerId.isEmpty) return 'demo-owner';
+    return ownerId;
+  }
+
   @override
   Future<List<RemoteFile>> getRemoteFiles(
     String path,
     FtpProfile profile,
   ) async {
     final normalizedPath = _normalizeRemotePath(path);
-    final data = await datasource.listRemoteFiles(normalizedPath, _getConfig(profile));
+    final data = await client.listRemoteFiles(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      path: normalizedPath,
+    );
     return data
         .map((map) => RemoteFileMapper.fromMap(map, normalizedPath))
         .where((file) => !_isPseudoEntry(file, normalizedPath))
@@ -45,28 +58,37 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<List<String>> getLocalFiles(String path) {
-    return datasource.listLocalFiles(path);
+  Future<List<String>> getLocalFiles(String path) async {
+    if (kIsWeb) return [];
+    final dir = Directory(path);
+    if (!dir.existsSync()) return [];
+    return dir
+        .listSync()
+        .whereType<File>()
+        .map((f) => f.uri.pathSegments.last)
+        .toList();
   }
 
   String _normalizeRemotePath(String value) {
     final trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed == "/") return "/";
-    final normalized = p.posix.normalize(trimmed.startsWith('/') ? trimmed : '/$trimmed');
-    return normalized == "." || normalized.isEmpty ? "/" : normalized;
+    if (trimmed.isEmpty || trimmed == '/') return '/';
+    final normalized = p.posix.normalize(
+      trimmed.startsWith('/') ? trimmed : '/$trimmed',
+    );
+    return normalized == '.' || normalized.isEmpty ? '/' : normalized;
   }
 
   bool _isPseudoEntry(RemoteFile file, String currentPath) {
     final name = file.name.trim();
     final normalizedCurrentPath = _normalizeRemotePath(currentPath);
     final normalizedFilePath = _normalizeRemotePath(file.path);
-    final currentBase = normalizedCurrentPath == "/"
-        ? "/"
+    final currentBase = normalizedCurrentPath == '/'
+        ? '/'
         : p.posix.basename(normalizedCurrentPath);
     return name.isEmpty ||
-        name == "/" ||
-        name == "." ||
-        name == ".." ||
+        name == '/' ||
+        name == '.' ||
+        name == '..' ||
         name == normalizedCurrentPath ||
         name == currentBase ||
         normalizedFilePath == normalizedCurrentPath;
@@ -99,7 +121,12 @@ class FtpRepositoryImpl implements FtpRepository {
     String remotePath,
     FtpProfile profile,
   ) {
-    return datasource.uploadFile(localPath, remotePath, _getConfig(profile));
+    return client.uploadFile(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      remotePath: _normalizeRemotePath(remotePath),
+      localFilePath: localPath,
+    );
   }
 
   @override
@@ -110,21 +137,23 @@ class FtpRepositoryImpl implements FtpRepository {
   ) {
     final remoteDirectory = p.dirname(file.path);
     final targetPath = '$localPath/${file.name}';
-    return datasource.downloadFileToPath(
-      file.name,
-      remoteDirectory == '.' ? '/' : remoteDirectory,
-      targetPath,
-      _getConfig(profile),
+    return client.downloadFileToPath(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      remotePath: remoteDirectory == '.' ? '/' : remoteDirectory,
+      fileName: file.name,
+      targetLocalPath: targetPath,
     );
   }
 
   @override
   Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile) {
     final directory = file.path == '/' ? '/' : p.dirname(file.path);
-    return datasource.deleteRemoteFile(
-      file.name,
-      directory == '.' ? '/' : directory,
-      _getConfig(profile),
+    return client.deleteRemoteFile(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      remotePath: directory == '.' ? '/' : directory,
+      fileName: file.name,
     );
   }
 
@@ -158,11 +187,12 @@ class FtpRepositoryImpl implements FtpRepository {
       return localPath;
     }
 
-    await datasource.downloadFileToPath(
-      file.name,
-      remotePath,
-      localPath,
-      _getConfig(profile),
+    await client.downloadFileToPath(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      remotePath: remotePath,
+      fileName: file.name,
+      targetLocalPath: localPath,
     );
     return localPath;
   }
@@ -173,13 +203,13 @@ class FtpRepositoryImpl implements FtpRepository {
     String remotePath,
     FtpProfile profile,
   ) async {
-    final local = await datasource.listLocalFiles(localPath);
-    final remote = await datasource.listRemoteFiles(
-      remotePath,
-      _getConfig(profile),
+    final remote = await client.listRemoteFiles(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      path: remotePath,
     );
-    final currentBase = _normalizeRemotePath(remotePath) == "/"
-        ? "/"
+    final currentBase = _normalizeRemotePath(remotePath) == '/'
+        ? '/'
         : p.posix.basename(_normalizeRemotePath(remotePath));
     final remoteNames = remote
         .map((e) => (e['name'] as String? ?? '').trim())
@@ -191,7 +221,7 @@ class FtpRepositoryImpl implements FtpRepository {
             name != _normalizeRemotePath(remotePath) &&
             name != currentBase)
         .toSet();
-    return local
+    return (await getLocalFiles(localPath))
         .where(remoteNames.contains)
         .map(
           (f) =>
@@ -201,52 +231,72 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<List<FtpProfile>> getProfiles(String ownerId) =>
-      _db.getProfiles(ownerId);
-
-  @override
-  Future<int> saveProfile(FtpProfile profile, String ownerId) {
-    if (profile.id == null) {
-      return _db.insertProfile(profile, ownerId);
-    } else {
-      return _db.updateProfile(profile, ownerId).then((_) => profile.id!);
-    }
+  Future<List<FtpProfile>> getProfiles(String ownerId) async {
+    final profiles = await client.getProfiles(ownerId);
+    return profiles.map(FtpProfile.fromMap).toList();
   }
 
   @override
-  Future<void> deleteProfile(int id, String ownerId) =>
-      _db.deleteProfile(id, ownerId);
+  Future<int> saveProfile(FtpProfile profile, String ownerId) async {
+    final payload = _profilePayload(profile, ownerId);
+    final saved = await client.saveProfile(payload);
+    final savedProfile = FtpProfile.fromMap(saved);
+    if (profile.id == null) {
+      await _db.insertProfile(savedProfile, ownerId);
+    } else {
+      await _db.updateProfile(savedProfile, ownerId);
+    }
+    return savedProfile.id ?? profile.id ?? 0;
+  }
+
+  @override
+  Future<void> deleteProfile(int id, String ownerId) async {
+    await client.deleteProfile(ownerId: ownerId, profileId: id);
+    await _db.deleteProfile(id, ownerId);
+  }
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
-    return datasource.testConnection(_getConfig(profile));
+    return client.testConnection(_profilePayload(profile, _ownerIdFor(profile)));
   }
 
   @override
   Future<List<SyncRecord>> getSyncHistory(String ownerId) =>
-      _db.getSyncHistory(ownerId);
+      client
+          .getSyncHistory(ownerId)
+          .then((items) => items.map(SyncRecord.fromMap).toList());
 
   @override
-  Future<void> saveSyncRecord(SyncRecord record) =>
-      _db.insertSyncRecord(record);
+  Future<void> saveSyncRecord(SyncRecord record) async {
+    await client.saveSyncRecord(record.toMap());
+  }
 
   @override
-  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) async => [];
+  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) =>
+      client
+          .getDumpSchedules(ownerId)
+          .then((items) => items.map(DumpSchedule.fromMap).toList());
 
   @override
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
     int profileId,
-  ) async => null;
+  ) async {
+    final schedule = await client.getDumpScheduleForProfile(
+      ownerId: ownerId,
+      profileId: profileId,
+    );
+    return schedule == null ? null : DumpSchedule.fromMap(schedule);
+  }
 
   @override
-  Future<int> saveDumpSchedule(DumpSchedule schedule) async => schedule.id ?? 0;
+  Future<int> saveDumpSchedule(DumpSchedule schedule) async {
+    final saved = await client.saveDumpSchedule(schedule.toMap());
+    final savedSchedule = DumpSchedule.fromMap(saved);
+    return savedSchedule.id ?? schedule.id ?? 0;
+  }
 
   @override
-  Future<void> deleteDumpSchedule(int id, String ownerId) async {}
+  Future<void> deleteDumpSchedule(int id, String ownerId) =>
+      client.deleteDumpSchedule(ownerId: ownerId, id: id);
 }
-
-
-
-
-

@@ -1,28 +1,21 @@
-import 'package:flutter/foundation.dart';
-
-import '../../data/datasources/fake_datasource.dart';
 import '../../data/datasources/firebase_auth_datasource.dart';
-import '../../data/datasources/ftp_real_datasource.dart';
-import '../../data/interfaces/ftp_datasource.dart';
+import '../../data/datasources/hotftp_api_client.dart';
 
 class AppDataSources {
-  final FtpDatasource ftpDatasource;
+  final HotftpApiClient apiClient;
   final FirebaseAuthDatasource firebaseAuthDatasource;
 
   AppDataSources({
-    required this.ftpDatasource,
+    required this.apiClient,
     required this.firebaseAuthDatasource,
   });
 }
 
 AppDataSources createDataSources() {
-  const useFakeFtp = bool.fromEnvironment('HOTFTP_USE_FAKE_FTP');
-  final ftpDatasource =
-      kIsWeb || useFakeFtp ? FakeFtpDatasource() : FtpRealDatasource();
-  debugPrint('HOTFTP: Initializing with ${ftpDatasource.runtimeType}');
+  final apiClient = HotftpApiClient();
 
   return AppDataSources(
-    ftpDatasource: ftpDatasource,
+    apiClient: apiClient,
     firebaseAuthDatasource: FirebaseAuthDatasource(),
   );
 }

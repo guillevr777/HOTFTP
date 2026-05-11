@@ -1,5 +1,6 @@
-﻿class FtpProfile {
+class FtpProfile {
   final int? id;
+  final String? ownerId;
   final String name;
   final String host;
   final int port;
@@ -10,6 +11,7 @@
 
   FtpProfile({
     this.id,
+    this.ownerId,
     required this.name,
     required this.host,
     this.port = 21,
@@ -21,6 +23,7 @@
 
   FtpProfile copyWith({
     int? id,
+    String? ownerId,
     String? name,
     String? host,
     int? port,
@@ -31,6 +34,7 @@
   }) {
     return FtpProfile(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       name: name ?? this.name,
       host: host ?? this.host,
       port: port ?? this.port,
@@ -43,6 +47,7 @@
 
   Map<String, dynamic> toMap() => {
         'id': id,
+        'ownerId': ownerId,
         'name': name,
         'host': host,
         'port': port,
@@ -53,7 +58,8 @@
       };
 
   factory FtpProfile.fromMap(Map<String, dynamic> map) => FtpProfile(
-        id: map['id'],
+        id: map['id'] is int ? map['id'] as int : int.tryParse('${map['id']}'),
+        ownerId: map['ownerId'] as String?,
         name: map['name'],
         host: map['host'],
         port: map['port'],

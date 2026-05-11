@@ -3,7 +3,7 @@ import type { ProfileRepository } from '../../../domain/repositories/profile-rep
 
 export class InMemoryProfileRepository implements ProfileRepository {
   private nextId = 2;
-  private readonly profiles: FtpProfile[] = [
+  private profiles: FtpProfile[] = [
     {
       id: 1,
       ownerId: 'demo-owner',
@@ -40,6 +40,12 @@ export class InMemoryProfileRepository implements ProfileRepository {
       this.profiles.find(
         (profile) => profile.ownerId === ownerId && profile.id === id,
       ) ?? null
+    );
+  }
+
+  async delete(ownerId: string, id: number): Promise<void> {
+    this.profiles = this.profiles.filter(
+      (profile) => !(profile.ownerId === ownerId && profile.id === id),
     );
   }
 }

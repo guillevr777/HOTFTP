@@ -3,7 +3,6 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:universal_io/io.dart';
 
-import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/local_file.dart';
@@ -18,7 +17,6 @@ class DatabaseHelper {
 
   final List<Map<String, dynamic>> _webProfiles = [];
   final List<Map<String, dynamic>> _webHistory = [];
-  final List<Map<String, dynamic>> _webSchedules = [];
   final List<Map<String, dynamic>> _webEvents = [];
   final List<Map<String, dynamic>> _webAlerts = [];
   final List<Map<String, dynamic>> _webVersions = [];
@@ -77,25 +75,6 @@ class DatabaseHelper {
         filesSkipped INTEGER NOT NULL DEFAULT 0,
         errorMessage TEXT,
         FOREIGN KEY (profileId) REFERENCES ftp_profiles(id)
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE dump_schedules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ownerId TEXT NOT NULL,
-        profileId INTEGER NOT NULL,
-        enabled INTEGER NOT NULL DEFAULT 1,
-        localPath TEXT NOT NULL,
-        remotePath TEXT NOT NULL,
-        sourceSide TEXT NOT NULL,
-        transferMode TEXT NOT NULL,
-        deleteSourceAfterCopy INTEGER NOT NULL DEFAULT 0,
-        intervalValue INTEGER NOT NULL DEFAULT 24,
-        intervalUnit TEXT NOT NULL DEFAULT 'hours',
-        lastRunAt TEXT,
-        nextRunAt TEXT,
-        FOREIGN KEY (profileId) REFERENCES ftp_profiles(id),
-        UNIQUE(ownerId, profileId)
       )
     ''');
     await db.execute('''
@@ -159,28 +138,6 @@ class DatabaseHelper {
     if (oldVersion < 3) {
       await _ensureColumn(db, 'ftp_profiles', 'ownerId', 'TEXT');
       await _ensureColumn(db, 'sync_records', 'ownerId', 'TEXT');
-    }
-
-    if (oldVersion < 4) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS dump_schedules (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          ownerId TEXT NOT NULL,
-          profileId INTEGER NOT NULL,
-          enabled INTEGER NOT NULL DEFAULT 1,
-          localPath TEXT NOT NULL,
-          remotePath TEXT NOT NULL,
-          sourceSide TEXT NOT NULL,
-          transferMode TEXT NOT NULL,
-          deleteSourceAfterCopy INTEGER NOT NULL DEFAULT 0,
-          intervalValue INTEGER NOT NULL DEFAULT 24,
-          intervalUnit TEXT NOT NULL DEFAULT 'hours',
-          lastRunAt TEXT,
-          nextRunAt TEXT,
-          FOREIGN KEY (profileId) REFERENCES ftp_profiles(id),
-          UNIQUE(ownerId, profileId)
-        )
-      ''');
     }
 
     if (oldVersion < 5) {
@@ -271,7 +228,10 @@ class DatabaseHelper {
       return map['id'] as int;
     }
     final db = await database;
-    return db!.insert('ftp_profiles', map..remove('id'));
+    if (map['id'] == null) {
+      map.remove('id');
+    }
+    return db!.insert('ftp_profiles', map);
   }
 
   Future<int> updateProfile(FtpProfile profile, String ownerId) async {
@@ -667,95 +627,6 @@ class DatabaseHelper {
     }).toList();
   }
 
-  // ---- Dump Schedules ----
-  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) async {
-    if (kIsWeb) {
-      return _webSchedules
-          .where((schedule) => schedule['ownerId'] == ownerId)
-          .map(DumpSchedule.fromMap)
-          .toList();
-    }
-    final db = await database;
-    final maps = await db!.query(
-      'dump_schedules',
-      where: 'ownerId = ?',
-      whereArgs: [ownerId],
-      orderBy: 'nextRunAt ASC',
-    );
-    return maps.map(DumpSchedule.fromMap).toList();
-  }
-
-  Future<DumpSchedule?> getDumpScheduleForProfile(
-    String ownerId,
-    int profileId,
-  ) async {
-    if (kIsWeb) {
-      for (final schedule in _webSchedules) {
-        if (schedule['ownerId'] == ownerId &&
-            schedule['profileId'] == profileId) {
-          return DumpSchedule.fromMap(schedule);
-        }
-      }
-      return null;
-    }
-    final db = await database;
-    final maps = await db!.query(
-      'dump_schedules',
-      where: 'ownerId = ? AND profileId = ?',
-      whereArgs: [ownerId, profileId],
-      limit: 1,
-    );
-    if (maps.isEmpty) return null;
-    return DumpSchedule.fromMap(maps.first);
-  }
-
-  Future<int> saveDumpSchedule(DumpSchedule schedule) async {
-    final map = schedule.toMap();
-    if (kIsWeb) {
-      final index = _webSchedules.indexWhere(
-        (item) =>
-            item['ownerId'] == schedule.ownerId &&
-            item['profileId'] == schedule.profileId,
-      );
-      if (index != -1) {
-        _webSchedules[index] = map;
-        return schedule.id ?? 0;
-      }
-      map['id'] = _webIdCounter++;
-      _webSchedules.add(map);
-      return map['id'] as int;
-    }
-    final db = await database;
-    if (schedule.id == null) {
-      return db!.insert(
-        'dump_schedules',
-        map..remove('id'),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-    await db!.update(
-      'dump_schedules',
-      map,
-      where: 'id = ? AND ownerId = ?',
-      whereArgs: [schedule.id, schedule.ownerId],
-    );
-    return schedule.id!;
-  }
-
-  Future<void> deleteDumpSchedule(int id, String ownerId) async {
-    if (kIsWeb) {
-      _webSchedules.removeWhere(
-        (schedule) => schedule['id'] == id && schedule['ownerId'] == ownerId,
-      );
-      return;
-    }
-    final db = await database;
-    await db!.delete(
-      'dump_schedules',
-      where: 'id = ? AND ownerId = ?',
-      whereArgs: [id, ownerId],
-    );
-  }
 }
 
 
