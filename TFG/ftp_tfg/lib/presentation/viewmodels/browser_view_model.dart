@@ -1,7 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:collection';
-
-import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -28,6 +27,10 @@ enum RemoteTypeFilter {
   archives,
   others,
 }
+
+enum RemoteFileViewMode { list, grid }
+
+enum RemoteGridDensity { compact, medium, large }
 
 class BrowserViewModel extends ChangeNotifier {
   final IGetRemoteFilesUseCase getRemoteFiles;
@@ -67,13 +70,21 @@ class BrowserViewModel extends ChangeNotifier {
   final Set<String> _queuedThumbnailPaths = {};
   final Set<String> _loadingThumbnailPaths = {};
   int _activeThumbnailLoads = 0;
-  static const int _maxConcurrentThumbnailLoads = 2;
+  static const int _maxConcurrentThumbnailLoads = 6;
+  static const int _visibleRemoteFileBatchSize = 50;
+  int _visibleRemoteFileCount = _visibleRemoteFileBatchSize;
+  List<RemoteFile>? _visibleRemoteFilesCache;
   String searchQuery = '';
   RemoteSortField sortField = RemoteSortField.name;
   SortDirection sortDirection = SortDirection.asc;
   RemoteTypeFilter typeFilter = RemoteTypeFilter.all;
+  RemoteFileViewMode displayMode = RemoteFileViewMode.list;
+  RemoteGridDensity gridDensity = RemoteGridDensity.medium;
 
   List<RemoteFile> get visibleRemoteFiles {
+    final cached = _visibleRemoteFilesCache;
+    if (cached != null) return cached;
+
     final filtered = remoteFiles.where((file) {
       final matchesSearch =
           searchQuery.isEmpty ||
@@ -97,8 +108,20 @@ class BrowserViewModel extends ChangeNotifier {
       return sortDirection == SortDirection.asc ? comparison : -comparison;
     });
 
+    _visibleRemoteFilesCache = filtered;
     return filtered;
   }
+
+  List<RemoteFile> get displayedRemoteFiles {
+    final files = visibleRemoteFiles;
+    final limit = _visibleRemoteFileCount < files.length
+        ? _visibleRemoteFileCount
+        : files.length;
+    return files.take(limit).toList(growable: false);
+  }
+
+  bool get hasMoreRemoteFiles =>
+      _visibleRemoteFileCount < visibleRemoteFiles.length;
 
   bool _matchesTypeFilter(RemoteFile file) {
     if (typeFilter == RemoteTypeFilter.all) return true;
@@ -133,9 +156,11 @@ class BrowserViewModel extends ChangeNotifier {
   }) async {
     final p = path ?? currentRemotePath;
     currentRemotePath = p;
+    _resetVisibleRemoteFilesPagination();
     final cached = _remoteCache[p];
     if (cached != null && !forceRefresh) {
       remoteFiles = List<RemoteFile>.of(cached);
+      _invalidateVisibleRemoteFilesCache();
       error = null;
       isLoading = false;
       notifyListeners();
@@ -156,6 +181,8 @@ class BrowserViewModel extends ChangeNotifier {
     sortField = RemoteSortField.name;
     sortDirection = SortDirection.asc;
     typeFilter = RemoteTypeFilter.all;
+    _resetVisibleRemoteFilesPagination();
+    _invalidateVisibleRemoteFilesCache();
     notifyListeners();
   }
 
@@ -218,6 +245,7 @@ class BrowserViewModel extends ChangeNotifier {
       if (currentRemotePath != path) return;
       remoteFiles = freshFiles;
       _remoteCache[path] = List<RemoteFile>.of(freshFiles);
+      _invalidateVisibleRemoteFilesCache();
       // Keep the first paint fast; sync metadata in the background.
       unawaited(_trackFileVersions());
       notifyListeners();
@@ -230,7 +258,9 @@ class BrowserViewModel extends ChangeNotifier {
   }
 
   Future<void> _trackFileVersions() async {
-    if (profile.id == null) return;
+    if (profile.id == null || profile.transportType == FtpTransportType.local) {
+      return;
+    }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
       try {
         final latest = await getLatestFileVersion.execute(
@@ -276,11 +306,15 @@ class BrowserViewModel extends ChangeNotifier {
 
   void setSearchQuery(String value) {
     searchQuery = value;
+    _resetVisibleRemoteFilesPagination();
+    _invalidateVisibleRemoteFilesCache();
     notifyListeners();
   }
 
   void setSortField(RemoteSortField value) {
     sortField = value;
+    _resetVisibleRemoteFilesPagination();
+    _invalidateVisibleRemoteFilesCache();
     notifyListeners();
   }
 
@@ -288,16 +322,53 @@ class BrowserViewModel extends ChangeNotifier {
     sortDirection = sortDirection == SortDirection.asc
         ? SortDirection.desc
         : SortDirection.asc;
+    _resetVisibleRemoteFilesPagination();
+    _invalidateVisibleRemoteFilesCache();
     notifyListeners();
   }
 
   void setTypeFilter(RemoteTypeFilter value) {
     typeFilter = value;
+    _resetVisibleRemoteFilesPagination();
+    _invalidateVisibleRemoteFilesCache();
+    notifyListeners();
+  }
+
+  void setDisplayMode(RemoteFileViewMode value) {
+    if (displayMode == value) return;
+    displayMode = value;
+    notifyListeners();
+  }
+
+  void toggleDisplayMode() {
+    setDisplayMode(
+      displayMode == RemoteFileViewMode.list
+          ? RemoteFileViewMode.grid
+          : RemoteFileViewMode.list,
+    );
+  }
+
+  void setGridDensity(RemoteGridDensity value) {
+    if (gridDensity == value) return;
+    gridDensity = value;
+    notifyListeners();
+  }
+
+  void loadMoreVisibleRemoteFiles() {
+    if (!hasMoreRemoteFiles) return;
+    _visibleRemoteFileCount += _visibleRemoteFileBatchSize;
     notifyListeners();
   }
 
   void requestThumbnail(RemoteFile file, String remotePath) {
-    if (!FileUtils.isImage(file.name)) return;
+    final isImage = FileUtils.isImage(file.name);
+    final isVideo = FileUtils.isVideo(file.name);
+    if (!isImage && !isVideo) return;
+    if (isVideo &&
+        !(defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
     if (thumbnails.containsKey(file.path)) return;
     if (_queuedThumbnailPaths.contains(file.path) ||
         _loadingThumbnailPaths.contains(file.path)) {
@@ -349,14 +420,19 @@ class BrowserViewModel extends ChangeNotifier {
     if (date == null) return 'Sin fecha';
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
+
+  void _resetVisibleRemoteFilesPagination() {
+    _visibleRemoteFileCount = _visibleRemoteFileBatchSize;
+  }
+
+  void _invalidateVisibleRemoteFilesCache() {
+    _visibleRemoteFilesCache = null;
+  }
 }
 
 class _ThumbnailRequest {
   final RemoteFile file;
   final String remotePath;
 
-  const _ThumbnailRequest({
-    required this.file,
-    required this.remotePath,
-  });
+  const _ThumbnailRequest({required this.file, required this.remotePath});
 }

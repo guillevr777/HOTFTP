@@ -1,7 +1,7 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:universal_io/io.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -13,6 +13,8 @@ import '../../domain/repositories/ftp_repository.dart';
 import '../interfaces/ftp_datasource.dart';
 import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
+import '../../utils/file_utils.dart';
+import '../../utils/thumbnail_cache.dart';
 import '../../utils/thumbnail_utils.dart';
 
 class FtpRepositoryImpl implements FtpRepository {
@@ -38,7 +40,10 @@ class FtpRepositoryImpl implements FtpRepository {
     FtpProfile profile,
   ) async {
     final normalizedPath = _normalizeRemotePath(path);
-    final data = await datasource.listRemoteFiles(normalizedPath, _getConfig(profile));
+    final data = await datasource.listRemoteFiles(
+      normalizedPath,
+      _getConfig(profile),
+    );
     return data
         .map((map) => RemoteFileMapper.fromMap(map, normalizedPath))
         .where((file) => !_isPseudoEntry(file, normalizedPath))
@@ -53,7 +58,9 @@ class FtpRepositoryImpl implements FtpRepository {
   String _normalizeRemotePath(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty || trimmed == "/") return "/";
-    final normalized = p.posix.normalize(trimmed.startsWith('/') ? trimmed : '/$trimmed');
+    final normalized = p.posix.normalize(
+      trimmed.startsWith('/') ? trimmed : '/$trimmed',
+    );
     return normalized == "." || normalized.isEmpty ? "/" : normalized;
   }
 
@@ -146,27 +153,55 @@ class FtpRepositoryImpl implements FtpRepository {
     FtpProfile profile,
   ) async {
     if (kIsWeb) return '';
-    final tempDir = await getTemporaryDirectory();
-    final cacheDir = Directory('${tempDir.path}/thumbnails');
-    if (!cacheDir.existsSync()) {
-      cacheDir.createSync(recursive: true);
-    }
-    final safeName = file.path.replaceAll('/', '_').replaceAll(':', '_');
-    final thumbnailPath = '${cacheDir.path}/${profile.id}_$safeName.jpg';
+    final cacheDir = await ThumbnailCache.resolveDirectory();
+    final cacheKey = ThumbnailCache.buildKey(
+      filePath: file.path,
+      fileName: file.name,
+      fileSize: file.size,
+      modifiedAt: file.modifiedAt,
+      profileId: profile.id ?? 0,
+      isVideo: FileUtils.isVideo(file.name),
+    );
+    final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
     final thumbFile = File(thumbnailPath);
 
     if (thumbFile.existsSync()) {
       return thumbnailPath;
     }
 
-    final sourcePath = '${cacheDir.path}/${profile.id}_$safeName.src';
+    final sourcePath = '${cacheDir.path}/$cacheKey.src';
+    final remoteDirectory = p.dirname(file.path);
     await datasource.downloadFileToPath(
       file.name,
-      remotePath,
+      remoteDirectory == '.' ? '/' : remoteDirectory,
       sourcePath,
       _getConfig(profile),
     );
     try {
+      if (FileUtils.isVideo(file.name)) {
+        if (Platform.isAndroid || Platform.isIOS) {
+          try {
+            final generated = await VideoThumbnail.thumbnailFile(
+              video: sourcePath,
+              thumbnailPath: thumbnailPath,
+              imageFormat: ImageFormat.PNG,
+              maxHeight: 160,
+              maxWidth: 160,
+              quality: 100,
+            );
+            if (generated != null && generated.isNotEmpty) {
+              return generated;
+            }
+          } catch (_) {
+            // Fall back to a generated poster if the native plugin is not
+            // available in the current session.
+          }
+        }
+        return ThumbnailUtils.buildVideoPlaceholderThumbnail(
+          thumbnailPath: thumbnailPath,
+        );
+      }
+
       return await ThumbnailUtils.buildThumbnailFromFile(
         sourcePath: sourcePath,
         thumbnailPath: thumbnailPath,
@@ -195,13 +230,15 @@ class FtpRepositoryImpl implements FtpRepository {
         : p.posix.basename(_normalizeRemotePath(remotePath));
     final remoteNames = remote
         .map((e) => (e['name'] as String? ?? '').trim())
-        .where((name) =>
-            name.isNotEmpty &&
-            name != '/' &&
-            name != '.' &&
-            name != '..' &&
-            name != _normalizeRemotePath(remotePath) &&
-            name != currentBase)
+        .where(
+          (name) =>
+              name.isNotEmpty &&
+              name != '/' &&
+              name != '.' &&
+              name != '..' &&
+              name != _normalizeRemotePath(remotePath) &&
+              name != currentBase,
+        )
         .toSet();
     return local
         .where(remoteNames.contains)
@@ -249,18 +286,9 @@ class FtpRepositoryImpl implements FtpRepository {
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
     FtpProfile profile,
-  ) =>
-      _db.getDumpScheduleForProfile(ownerId, profile.id ?? 0);
+  ) => _db.getDumpScheduleForProfile(ownerId, profile.id ?? 0);
 
   @override
-  Future<int> saveDumpSchedule(
-    DumpSchedule schedule,
-    FtpProfile profile,
-  ) =>
+  Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
       _db.saveDumpSchedule(schedule);
 }
-
-
-
-
-

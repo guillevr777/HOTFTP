@@ -12,8 +12,9 @@ class HotftpRawFtpClient {
       return int.parse(epsv.group(1)!);
     }
 
-    final pasv = RegExp(r'\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)')
-        .firstMatch(response);
+    final pasv = RegExp(
+      r'\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)',
+    ).firstMatch(response);
     if (pasv != null) {
       final p1 = int.parse(pasv.group(5)!);
       final p2 = int.parse(pasv.group(6)!);
@@ -200,10 +201,7 @@ class HotftpRawFtpClient {
     }
   }
 
-  Future<int> sizeFile(
-    String fileName,
-    Map<String, dynamic> config,
-  ) async {
+  Future<int> sizeFile(String fileName, Map<String, dynamic> config) async {
     final session = await _openSession(config);
     try {
       final size = await session.sizeFile(fileName);
@@ -312,7 +310,9 @@ class _RawFtpSession {
     _ensureReady();
     final reply = await _send('CWD $path');
     if (!reply.isSuccess) {
-      throw FormatException('Cannot change directory to $path: ${reply.message}');
+      throw FormatException(
+        'Cannot change directory to $path: ${reply.message}',
+      );
     }
   }
 
@@ -349,7 +349,9 @@ class _RawFtpSession {
       throw FileSystemException('Local file not found', localFilePath);
     }
 
-    final transfer = await _openDataTransferChannel('STOR ${file.uri.pathSegments.last}');
+    final transfer = await _openDataTransferChannel(
+      'STOR ${file.uri.pathSegments.last}',
+    );
     final dataSocket = transfer.dataSocket;
     final firstReply = transfer.firstReply;
     if (!firstReply.isPreliminary && !firstReply.isSuccess) {
@@ -368,7 +370,10 @@ class _RawFtpSession {
     }
   }
 
-  Future<void> downloadFile(String remoteFileName, String targetLocalPath) async {
+  Future<void> downloadFile(
+    String remoteFileName,
+    String targetLocalPath,
+  ) async {
     _ensureReady();
 
     final transfer = await _openDataTransferChannel('RETR $remoteFileName');
@@ -434,7 +439,8 @@ class _RawFtpSession {
     return int.tryParse(value) ?? -1;
   }
 
-  Future<bool> existsFile(String fileName) async => await sizeFile(fileName) != -1;
+  Future<bool> existsFile(String fileName) async =>
+      await sizeFile(fileName) != -1;
 
   Future<bool> createFolderIfNotExist(String directoryName) async {
     if (await sizeFile(directoryName) == -1) {
@@ -531,10 +537,7 @@ class _RawFtpSession {
     return Socket.connect(host, port, timeout: timeout);
   }
 
-  Future<FTPReplyData> _send(
-    String command, {
-    bool waitForReply = true,
-  }) async {
+  Future<FTPReplyData> _send(String command, {bool waitForReply = true}) async {
     _socket!.write(utf8.encode('$command\r\n'));
     if (!waitForReply) {
       return FTPReplyData(code: 200, message: '');
@@ -556,7 +559,11 @@ class _RawFtpSession {
     }).timeout(Duration(seconds: timeoutSeconds));
 
     final message = HotftpRawFtpClient.decodeBytes(buffer).trim();
-    final lines = message.replaceAll('\r', '').split('\n').where((line) => line.isNotEmpty).toList();
+    final lines = message
+        .replaceAll('\r', '')
+        .split('\n')
+        .where((line) => line.isNotEmpty)
+        .toList();
     if (lines.isEmpty) {
       throw const FormatException('Empty FTP reply');
     }
@@ -614,53 +621,63 @@ class _RawFtpSession {
     return data;
   }
 
-static Map<String, dynamic>? _parseListLine(String line) {
-  final reg = RegExp(
-    r'^([\-ld])([\-rwxs]{9})\s+(\d+)\s+(\w+)\s+(\w+)\s+(\d+)\s+(\w{3}\s+\d{1,2}\s+(?:\d{1,2}:\d{1,2}|\d{4}))\s+(.+)$',
-  );
-  final match = reg.firstMatch(line);
-  if (match != null) {
+  static Map<String, dynamic>? _parseListLine(String line) {
+    final dosMatch = RegExp(
+      r'^(\d{2}-\d{2}-\d{2})\s+(\d{2}:\d{2}[AP]M)\s+(<DIR>|\d+)\s+(.+)$',
+      caseSensitive: false,
+    ).firstMatch(line);
+    if (dosMatch != null) {
+      final sizeToken = dosMatch.group(3)!;
+      return {
+        'name': dosMatch.group(4)!,
+        'size': sizeToken == '<DIR>' ? 0 : int.tryParse(sizeToken) ?? 0,
+        'isDir': sizeToken == '<DIR>',
+        'modifyTime': null,
+      };
+    }
+
+    final reg = RegExp(
+      r'^([\-ld])([\-rwxs]{9})\s+(\d+)\s+(\w+)\s+(\w+)\s+(\d+)\s+(\w{3}\s+\d{1,2}\s+(?:\d{1,2}:\d{1,2}|\d{4}))\s+(.+)$',
+    );
+    final match = reg.firstMatch(line);
+    if (match != null) {
+      return {
+        'name': match.group(8)!,
+        'size': int.tryParse(match.group(6)!) ?? 0,
+        'isDir': match.group(1) == 'd',
+        'modifyTime': null,
+      };
+    }
+
+    final tokens = line
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    if (tokens.length < 9) return null;
+    final typeToken = tokens.first;
+    final sizeToken = tokens[4];
+    final name = tokens.sublist(8).join(' ');
     return {
-      'name': match.group(8)!,
-      'size': int.tryParse(match.group(6)!) ?? 0,
-      'isDir': match.group(1) == 'd',
+      'name': name,
+      'size': int.tryParse(sizeToken) ?? 0,
+      'isDir': typeToken == 'd',
       'modifyTime': null,
     };
   }
-
-  final tokens = line.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
-  if (tokens.length < 9) return null;
-  final typeToken = tokens.first;
-  final sizeToken = tokens[4];
-  final name = tokens.sublist(8).join(' ');
-  return {
-    'name': name,
-    'size': int.tryParse(sizeToken) ?? 0,
-    'isDir': typeToken == 'd',
-    'modifyTime': null,
-  };
-}
-
 }
 
 class _DataReply {
   final Socket dataSocket;
   final FTPReplyData firstReply;
 
-  _DataReply({
-    required this.dataSocket,
-    required this.firstReply,
-  });
+  _DataReply({required this.dataSocket, required this.firstReply});
 }
 
 class FTPReplyData {
   final int code;
   final String message;
 
-  FTPReplyData({
-    required this.code,
-    required this.message,
-  });
+  FTPReplyData({required this.code, required this.message});
 
   bool get isSuccess => code >= 200 && code < 400;
   bool get isPreliminary => code == 125 || code == 150;

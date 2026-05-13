@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:universal_io/io.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -10,6 +10,8 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
+import '../../utils/file_utils.dart';
+import '../../utils/thumbnail_cache.dart';
 import '../mappers/remote_file_mapper.dart';
 import '../datasources/hotftp_api_client.dart';
 import '../../utils/thumbnail_utils.dart';
@@ -177,29 +179,57 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     FtpProfile profile,
   ) async {
     if (kIsWeb) return '';
-    final tempDir = await getTemporaryDirectory();
-    final cacheDir = Directory('${tempDir.path}/thumbnails');
-    if (!cacheDir.existsSync()) {
-      cacheDir.createSync(recursive: true);
-    }
-    final safeName = file.path.replaceAll('/', '_').replaceAll(':', '_');
-    final thumbnailPath = '${cacheDir.path}/${profile.id}_$safeName.jpg';
+    final cacheDir = await ThumbnailCache.resolveDirectory();
+    final cacheKey = ThumbnailCache.buildKey(
+      filePath: file.path,
+      fileName: file.name,
+      fileSize: file.size,
+      modifiedAt: file.modifiedAt,
+      profileId: profile.id ?? 0,
+      isVideo: FileUtils.isVideo(file.name),
+    );
+    final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
     final thumbFile = File(thumbnailPath);
 
     if (thumbFile.existsSync()) {
       return thumbnailPath;
     }
 
-    final sourcePath = '${cacheDir.path}/${profile.id}_$safeName.src';
+    final sourcePath = '${cacheDir.path}/$cacheKey.src';
+    final remoteDirectory = p.dirname(file.path);
 
     await client.downloadFileToPath(
       ownerId: _ownerIdFor(profile),
       profileId: profile.id ?? 0,
-      remotePath: remotePath,
+      remotePath: remoteDirectory == '.' ? '/' : remoteDirectory,
       fileName: file.name,
       targetLocalPath: sourcePath,
     );
     try {
+      if (FileUtils.isVideo(file.name)) {
+        if (Platform.isAndroid || Platform.isIOS) {
+          try {
+            final generated = await VideoThumbnail.thumbnailFile(
+              video: sourcePath,
+              thumbnailPath: thumbnailPath,
+              imageFormat: ImageFormat.PNG,
+              maxHeight: 160,
+              maxWidth: 160,
+              quality: 100,
+            );
+            if (generated != null && generated.isNotEmpty) {
+              return generated;
+            }
+          } catch (_) {
+            // Fall back to a generated poster if the native plugin is not
+            // available in the current session.
+          }
+        }
+        return ThumbnailUtils.buildVideoPlaceholderThumbnail(
+          thumbnailPath: thumbnailPath,
+        );
+      }
+
       return await ThumbnailUtils.buildThumbnailFromFile(
         sourcePath: sourcePath,
         thumbnailPath: thumbnailPath,
@@ -228,13 +258,15 @@ class ApiFtpRepositoryImpl implements FtpRepository {
         : p.posix.basename(_normalizeRemotePath(remotePath));
     final remoteNames = remote
         .map((e) => (e['name'] as String? ?? '').trim())
-        .where((name) =>
-            name.isNotEmpty &&
-            name != '/' &&
-            name != '.' &&
-            name != '..' &&
-            name != _normalizeRemotePath(remotePath) &&
-            name != currentBase)
+        .where(
+          (name) =>
+              name.isNotEmpty &&
+              name != '/' &&
+              name != '.' &&
+              name != '..' &&
+              name != _normalizeRemotePath(remotePath) &&
+              name != currentBase,
+        )
         .toSet();
     return (await getLocalFiles(localPath))
         .where(remoteNames.contains)
@@ -261,22 +293,20 @@ class ApiFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<void> deleteProfile(FtpProfile profile, String ownerId) async {
-    await client.deleteProfile(
-      ownerId: ownerId,
-      profileId: profile.id ?? 0,
-    );
+    await client.deleteProfile(ownerId: ownerId, profileId: profile.id ?? 0);
   }
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
-    return client.testConnection(_profilePayload(profile, _ownerIdFor(profile)));
+    return client.testConnection(
+      _profilePayload(profile, _ownerIdFor(profile)),
+    );
   }
 
   @override
-  Future<List<SyncRecord>> getSyncHistory(String ownerId) =>
-      client
-          .getSyncHistory(ownerId)
-          .then((items) => items.map(SyncRecord.fromMap).toList());
+  Future<List<SyncRecord>> getSyncHistory(String ownerId) => client
+      .getSyncHistory(ownerId)
+      .then((items) => items.map(SyncRecord.fromMap).toList());
 
   @override
   Future<void> saveSyncRecord(SyncRecord record, FtpProfile profile) async {

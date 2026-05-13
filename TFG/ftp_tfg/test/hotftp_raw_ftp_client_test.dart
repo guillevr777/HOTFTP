@@ -6,7 +6,9 @@ import 'package:ftp_tfg/data/datasources/hotftp_raw_ftp_client.dart';
 void main() {
   test('parses EPSV passive port', () {
     expect(
-      HotftpRawFtpClient.parsePassivePort('229 Entering Extended Passive Mode (|||49152|)'),
+      HotftpRawFtpClient.parsePassivePort(
+        '229 Entering Extended Passive Mode (|||49152|)',
+      ),
       49152,
     );
   });
@@ -48,5 +50,21 @@ void main() {
     expect(parsed.first['name'], 'FileName.txt');
     expect(parsed.first['size'], 213);
     expect(parsed.first['isDir'], isFalse);
+  });
+
+  test('parses DOS directory listing', () {
+    final parsed = HotftpRawFtpClient.parseDirectoryListing(
+      '05-12-26  03:24PM       <DIR>          Fotos\r\n'
+      '05-12-26  03:25PM               1024 documento.txt\r\n',
+      false,
+    );
+
+    expect(parsed, hasLength(2));
+    expect(parsed[0]['name'], 'Fotos');
+    expect(parsed[0]['isDir'], isTrue);
+    expect(parsed[0]['size'], 0);
+    expect(parsed[1]['name'], 'documento.txt');
+    expect(parsed[1]['isDir'], isFalse);
+    expect(parsed[1]['size'], 1024);
   });
 }
