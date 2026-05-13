@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:universal_io/io.dart';
 
 import '../../domain/entities/file_version.dart';
+import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/local_file.dart';
 import '../../domain/entities/system_alert.dart';
@@ -20,6 +21,7 @@ class DatabaseHelper {
   final List<Map<String, dynamic>> _webEvents = [];
   final List<Map<String, dynamic>> _webAlerts = [];
   final List<Map<String, dynamic>> _webVersions = [];
+  final List<Map<String, dynamic>> _webSchedules = [];
   int _webIdCounter = 1;
 
   DatabaseHelper._internal();
@@ -42,7 +44,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 6,
+      version: 8,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -53,6 +55,7 @@ class DatabaseHelper {
       CREATE TABLE ftp_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ownerId TEXT NOT NULL,
+        transportType TEXT NOT NULL DEFAULT 'local',
         name TEXT NOT NULL,
         host TEXT NOT NULL,
         port INTEGER NOT NULL DEFAULT 21,
@@ -117,6 +120,24 @@ class DatabaseHelper {
         source TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         UNIQUE(ownerId, profileId, filePath, versionNumber)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE dump_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ownerId TEXT NOT NULL,
+        profileId INTEGER NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        localPath TEXT NOT NULL,
+        remotePath TEXT NOT NULL,
+        sourceSide TEXT NOT NULL,
+        transferMode TEXT NOT NULL,
+        deleteSourceAfterCopy INTEGER NOT NULL DEFAULT 0,
+        intervalValue INTEGER NOT NULL DEFAULT 24,
+        intervalUnit TEXT NOT NULL DEFAULT 'hours',
+        lastRunAt TEXT,
+        nextRunAt TEXT,
+        UNIQUE(ownerId, profileId)
       )
     ''');
   }
@@ -187,6 +208,34 @@ class DatabaseHelper {
         )
       ''');
     }
+
+    if (oldVersion < 7) {
+      await _ensureColumn(db, 'ftp_profiles', 'transportType', 'TEXT');
+      await db.execute(
+        "UPDATE ftp_profiles SET transportType = COALESCE(transportType, 'local')",
+      );
+    }
+
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS dump_schedules (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ownerId TEXT NOT NULL,
+          profileId INTEGER NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          localPath TEXT NOT NULL,
+          remotePath TEXT NOT NULL,
+          sourceSide TEXT NOT NULL,
+          transferMode TEXT NOT NULL,
+          deleteSourceAfterCopy INTEGER NOT NULL DEFAULT 0,
+          intervalValue INTEGER NOT NULL DEFAULT 24,
+          intervalUnit TEXT NOT NULL DEFAULT 'hours',
+          lastRunAt TEXT,
+          nextRunAt TEXT,
+          UNIQUE(ownerId, profileId)
+        )
+      ''');
+    }
   }
 
   Future<void> _ensureColumn(
@@ -207,7 +256,12 @@ class DatabaseHelper {
     if (kIsWeb) {
       return _webProfiles
           .where((profile) => profile['ownerId'] == ownerId)
-          .map(FtpProfile.fromMap)
+          .map(
+            (profile) => FtpProfile.fromMap(
+              profile,
+              defaultTransportType: FtpTransportType.local,
+            ),
+          )
           .toList();
     }
     final db = await database;
@@ -217,7 +271,14 @@ class DatabaseHelper {
       whereArgs: [ownerId],
       orderBy: 'name ASC',
     );
-    return maps.map(FtpProfile.fromMap).toList();
+    return maps
+        .map(
+          (map) => FtpProfile.fromMap(
+            map,
+            defaultTransportType: FtpTransportType.local,
+          ),
+        )
+        .toList();
   }
 
   Future<int> insertProfile(FtpProfile profile, String ownerId) async {
@@ -265,6 +326,67 @@ class DatabaseHelper {
       where: 'id = ? AND ownerId = ?',
       whereArgs: [id, ownerId],
     );
+  }
+
+  // ---- Dump schedules ----
+  Future<DumpSchedule?> getDumpScheduleForProfile(
+    String ownerId,
+    int profileId,
+  ) async {
+    if (kIsWeb) {
+      final schedule = _webSchedules.firstWhere(
+        (item) => item['ownerId'] == ownerId && item['profileId'] == profileId,
+        orElse: () => <String, dynamic>{},
+      );
+      return schedule.isEmpty ? null : DumpSchedule.fromMap(schedule);
+    }
+    final db = await database;
+    final maps = await db!.query(
+      'dump_schedules',
+      where: 'ownerId = ? AND profileId = ?',
+      whereArgs: [ownerId, profileId],
+      limit: 1,
+    );
+    if (maps.isEmpty) return null;
+    return DumpSchedule.fromMap(maps.first);
+  }
+
+  Future<int> saveDumpSchedule(DumpSchedule schedule) async {
+    final map = schedule.toMap();
+    if (kIsWeb) {
+      final index = _webSchedules.indexWhere(
+        (item) =>
+            item['ownerId'] == schedule.ownerId &&
+            item['profileId'] == schedule.profileId,
+      );
+      if (index >= 0) {
+        final existingId = _webSchedules[index]['id'] as int?;
+        _webSchedules[index] = map;
+        return existingId ?? schedule.id ?? 0;
+      }
+      map['id'] = _webIdCounter++;
+      _webSchedules.add(map);
+      return map['id'] as int;
+    }
+    final db = await database;
+    final existing = await db!.query(
+      'dump_schedules',
+      columns: ['id'],
+      where: 'ownerId = ? AND profileId = ?',
+      whereArgs: [schedule.ownerId, schedule.profileId],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      final id = existing.first['id'] as int;
+      await db.update(
+        'dump_schedules',
+        map..remove('id'),
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return id;
+    }
+    return db.insert('dump_schedules', map..remove('id'));
   }
 
   // ---- Sync Records ----

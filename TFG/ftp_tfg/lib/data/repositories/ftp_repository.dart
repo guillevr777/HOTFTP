@@ -13,6 +13,7 @@ import '../../domain/repositories/ftp_repository.dart';
 import '../interfaces/ftp_datasource.dart';
 import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
+import '../../utils/thumbnail_utils.dart';
 
 class FtpRepositoryImpl implements FtpRepository {
   final FtpDatasource datasource;
@@ -151,20 +152,31 @@ class FtpRepositoryImpl implements FtpRepository {
       cacheDir.createSync(recursive: true);
     }
     final safeName = file.path.replaceAll('/', '_').replaceAll(':', '_');
-    final localPath = '${cacheDir.path}/${profile.id}_$safeName';
-    final localFile = File(localPath);
+    final thumbnailPath = '${cacheDir.path}/${profile.id}_$safeName.jpg';
+    final thumbFile = File(thumbnailPath);
 
-    if (localFile.existsSync()) {
-      return localPath;
+    if (thumbFile.existsSync()) {
+      return thumbnailPath;
     }
 
+    final sourcePath = '${cacheDir.path}/${profile.id}_$safeName.src';
     await datasource.downloadFileToPath(
       file.name,
       remotePath,
-      localPath,
+      sourcePath,
       _getConfig(profile),
     );
-    return localPath;
+    try {
+      return await ThumbnailUtils.buildThumbnailFromFile(
+        sourcePath: sourcePath,
+        thumbnailPath: thumbnailPath,
+      );
+    } finally {
+      final srcFile = File(sourcePath);
+      if (srcFile.existsSync()) {
+        await srcFile.delete();
+      }
+    }
   }
 
   @override
@@ -206,16 +218,19 @@ class FtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<int> saveProfile(FtpProfile profile, String ownerId) {
+    final localProfile = profile.copyWith(
+      transportType: FtpTransportType.local,
+    );
     if (profile.id == null) {
-      return _db.insertProfile(profile, ownerId);
+      return _db.insertProfile(localProfile, ownerId);
     } else {
-      return _db.updateProfile(profile, ownerId).then((_) => profile.id!);
+      return _db.updateProfile(localProfile, ownerId).then((_) => profile.id!);
     }
   }
 
   @override
-  Future<void> deleteProfile(int id, String ownerId) =>
-      _db.deleteProfile(id, ownerId);
+  Future<void> deleteProfile(FtpProfile profile, String ownerId) =>
+      _db.deleteProfile(profile.id ?? 0, ownerId);
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
@@ -227,23 +242,22 @@ class FtpRepositoryImpl implements FtpRepository {
       _db.getSyncHistory(ownerId);
 
   @override
-  Future<void> saveSyncRecord(SyncRecord record) =>
+  Future<void> saveSyncRecord(SyncRecord record, FtpProfile profile) =>
       _db.insertSyncRecord(record);
-
-  @override
-  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) async => [];
 
   @override
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
-    int profileId,
-  ) async => null;
+    FtpProfile profile,
+  ) =>
+      _db.getDumpScheduleForProfile(ownerId, profile.id ?? 0);
 
   @override
-  Future<int> saveDumpSchedule(DumpSchedule schedule) async => schedule.id ?? 0;
-
-  @override
-  Future<void> deleteDumpSchedule(int id, String ownerId) async {}
+  Future<int> saveDumpSchedule(
+    DumpSchedule schedule,
+    FtpProfile profile,
+  ) =>
+      _db.saveDumpSchedule(schedule);
 }
 
 

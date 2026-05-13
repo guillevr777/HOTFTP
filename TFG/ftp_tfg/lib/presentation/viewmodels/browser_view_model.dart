@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:collection';
+
+import 'package:flutter/material.dart';
 
 import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -59,6 +62,12 @@ class BrowserViewModel extends ChangeNotifier {
   double downloadProgress = 0;
   bool isTransferring = false;
   Map<String, String> thumbnails = {};
+  final Map<String, List<RemoteFile>> _remoteCache = {};
+  final Queue<_ThumbnailRequest> _thumbnailQueue = Queue<_ThumbnailRequest>();
+  final Set<String> _queuedThumbnailPaths = {};
+  final Set<String> _loadingThumbnailPaths = {};
+  int _activeThumbnailLoads = 0;
+  static const int _maxConcurrentThumbnailLoads = 2;
   String searchQuery = '';
   RemoteSortField sortField = RemoteSortField.name;
   SortDirection sortDirection = SortDirection.asc;
@@ -118,21 +127,36 @@ class BrowserViewModel extends ChangeNotifier {
     return 5;
   }
 
-  Future<void> loadRemoteFiles([String? path]) async {
+  Future<void> loadRemoteFiles({
+    String? path,
+    bool forceRefresh = false,
+  }) async {
     final p = path ?? currentRemotePath;
+    currentRemotePath = p;
+    final cached = _remoteCache[p];
+    if (cached != null && !forceRefresh) {
+      remoteFiles = List<RemoteFile>.of(cached);
+      error = null;
+      isLoading = false;
+      notifyListeners();
+      unawaited(_refreshRemoteFiles(p));
+      return;
+    }
+
     isLoading = true;
     error = null;
     notifyListeners();
-    try {
-      remoteFiles = await getRemoteFiles.execute(p, profile);
-      currentRemotePath = p;
-      await _trackFileVersions();
-    } catch (e) {
-      error = "Error al listar archivos: $e";
-    }
+    await _refreshRemoteFiles(p);
     isLoading = false;
     notifyListeners();
-    _loadAllThumbnails();
+  }
+
+  void resetFilters() {
+    searchQuery = '';
+    sortField = RemoteSortField.name;
+    sortDirection = SortDirection.asc;
+    typeFilter = RemoteTypeFilter.all;
+    notifyListeners();
   }
 
   Future<void> loadLocalFiles([String? path]) async {
@@ -174,6 +198,7 @@ class BrowserViewModel extends ChangeNotifier {
         profile,
       );
       uploadProgress = 1;
+      _remoteCache.remove(currentRemotePath);
       await loadRemoteFiles();
     } catch (e) {
       error = "Error al subir: $e";
@@ -184,7 +209,24 @@ class BrowserViewModel extends ChangeNotifier {
 
   Future<void> navigateRemote(RemoteFile folder) async {
     if (!folder.isDirectory) return;
-    await loadRemoteFiles(folder.path);
+    await loadRemoteFiles(path: folder.path);
+  }
+
+  Future<void> _refreshRemoteFiles(String path) async {
+    try {
+      final freshFiles = await getRemoteFiles.execute(path, profile);
+      if (currentRemotePath != path) return;
+      remoteFiles = freshFiles;
+      _remoteCache[path] = List<RemoteFile>.of(freshFiles);
+      // Keep the first paint fast; sync metadata in the background.
+      unawaited(_trackFileVersions());
+      notifyListeners();
+    } catch (e) {
+      remoteFiles = [];
+      error = "Error al listar archivos: $e";
+      debugPrint('HOTFTP: loadRemoteFiles failed for $path -> $e');
+      notifyListeners();
+    }
   }
 
   Future<void> _trackFileVersions() async {
@@ -229,7 +271,7 @@ class BrowserViewModel extends ChangeNotifier {
     final newPath = parts.isEmpty || parts.join('/').isEmpty
         ? '/'
         : parts.join('/');
-    loadRemoteFiles(newPath);
+    loadRemoteFiles(path: newPath);
   }
 
   void setSearchQuery(String value) {
@@ -254,29 +296,51 @@ class BrowserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadAllThumbnails() async {
-    final path = currentRemotePath;
-    for (final file in remoteFiles) {
-      if (!file.isDirectory &&
-          FileUtils.isImage(file.name) &&
-          file.size < 5 * 1024 * 1024) {
-        await loadThumbnail(file, path);
-      }
+  void requestThumbnail(RemoteFile file, String remotePath) {
+    if (!FileUtils.isImage(file.name)) return;
+    if (thumbnails.containsKey(file.path)) return;
+    if (_queuedThumbnailPaths.contains(file.path) ||
+        _loadingThumbnailPaths.contains(file.path)) {
+      return;
     }
+
+    _queuedThumbnailPaths.add(file.path);
+    _thumbnailQueue.add(_ThumbnailRequest(file: file, remotePath: remotePath));
+    _pumpThumbnailQueue();
   }
 
   Future<void> loadThumbnail(RemoteFile file, String remotePath) async {
-    if (thumbnails.containsKey(file.path)) return;
+    requestThumbnail(file, remotePath);
+  }
+
+  void _pumpThumbnailQueue() {
+    while (_activeThumbnailLoads < _maxConcurrentThumbnailLoads &&
+        _thumbnailQueue.isNotEmpty) {
+      final request = _thumbnailQueue.removeFirst();
+      _queuedThumbnailPaths.remove(request.file.path);
+      _loadingThumbnailPaths.add(request.file.path);
+      _activeThumbnailLoads++;
+      unawaited(_runThumbnailRequest(request));
+    }
+  }
+
+  Future<void> _runThumbnailRequest(_ThumbnailRequest request) async {
     try {
       final localPath = await downloadThumbnailUseCase.execute(
-        file,
-        remotePath,
+        request.file,
+        request.remotePath,
         profile,
       );
-      thumbnails[file.path] = localPath;
+      thumbnails[request.file.path] = localPath;
       notifyListeners();
     } catch (e) {
-      debugPrint("Error cargando miniatura para ${file.name}: $e");
+      debugPrint("Error cargando miniatura para ${request.file.name}: $e");
+    } finally {
+      _loadingThumbnailPaths.remove(request.file.path);
+      if (_activeThumbnailLoads > 0) {
+        _activeThumbnailLoads--;
+      }
+      _pumpThumbnailQueue();
     }
   }
 
@@ -287,6 +351,12 @@ class BrowserViewModel extends ChangeNotifier {
   }
 }
 
+class _ThumbnailRequest {
+  final RemoteFile file;
+  final String remotePath;
 
-
-
+  const _ThumbnailRequest({
+    required this.file,
+    required this.remotePath,
+  });
+}

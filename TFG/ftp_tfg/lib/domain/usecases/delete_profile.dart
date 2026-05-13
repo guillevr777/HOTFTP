@@ -1,5 +1,6 @@
-﻿import '../repositories/ftp_repository.dart';
+import '../entities/ftp_profile.dart';
 import '../interfaces/i_delete_profile_use_case.dart';
+import '../repositories/ftp_repository.dart';
 
 class DeleteProfile implements IDeleteProfileUseCase {
   final FtpRepository repository;
@@ -7,10 +8,6 @@ class DeleteProfile implements IDeleteProfileUseCase {
   DeleteProfile(this.repository);
 
   @override
-  Future<void> execute(int id, String ownerId) =>
-      repository.deleteProfile(id, ownerId);
+  Future<void> execute(FtpProfile profile, String ownerId) =>
+      repository.deleteProfile(profile, ownerId);
 }
-
-
-
-

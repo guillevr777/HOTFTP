@@ -1,5 +1,7 @@
 import '../../data/repositories/firebase_auth_repository_impl.dart';
 import '../../data/repositories/ftp_api_repository.dart';
+import '../../data/repositories/ftp_repository.dart';
+import '../../data/repositories/hybrid_ftp_repository.dart';
 import '../../data/repositories/monitoring_api_repository.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/ftp_repository.dart' as domain_ftp;
@@ -19,8 +21,14 @@ class AppRepositories {
 }
 
 AppRepositories createRepositories(AppDataSources dataSources) {
+  final localFtpRepository = FtpRepositoryImpl(dataSources.ftpDatasource);
+  final remoteFtpRepository = ApiFtpRepositoryImpl(dataSources.apiClient);
+
   return AppRepositories(
-    ftpRepository: ApiFtpRepositoryImpl(dataSources.apiClient),
+    ftpRepository: HybridFtpRepositoryImpl(
+      localRepository: localFtpRepository,
+      remoteRepository: remoteFtpRepository,
+    ),
     monitoringRepository: ApiMonitoringRepository(dataSources.apiClient),
     authRepository: FirebaseAuthRepositoryImpl(dataSources.firebaseAuthDatasource),
   );

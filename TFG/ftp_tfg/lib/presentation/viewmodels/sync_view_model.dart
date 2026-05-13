@@ -128,6 +128,7 @@ class SyncViewModel extends ChangeNotifier {
           filesTransferred: filesTransferred,
           filesSkipped: filesSkipped,
         ),
+        profile,
       );
       await _applyAutomaticRules();
       await _trackEvent(

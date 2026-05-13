@@ -33,17 +33,15 @@ abstract class FtpRepository {
   );
   Future<List<FtpProfile>> getProfiles(String ownerId);
   Future<int> saveProfile(FtpProfile profile, String ownerId);
-  Future<void> deleteProfile(int id, String ownerId);
+  Future<void> deleteProfile(FtpProfile profile, String ownerId);
   Future<bool> testConnection(FtpProfile profile);
   Future<List<SyncRecord>> getSyncHistory(String ownerId);
-  Future<void> saveSyncRecord(SyncRecord record);
-  Future<List<DumpSchedule>> getDumpSchedules(String ownerId);
+  Future<void> saveSyncRecord(SyncRecord record, FtpProfile profile);
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
-    int profileId,
+    FtpProfile profile,
   );
-  Future<int> saveDumpSchedule(DumpSchedule schedule);
-  Future<void> deleteDumpSchedule(int id, String ownerId);
+  Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile);
 }
 
 

@@ -286,14 +286,6 @@ class HotftpApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> getDumpSchedules(String ownerId) async {
-    final response = await http.get(
-      _uri('/api/v1/schedules', {'ownerId': ownerId}),
-    );
-    _ensureSuccess(response);
-    return _decodeList(response.body);
-  }
-
   Future<Map<String, dynamic>?> getDumpScheduleForProfile({
     required String ownerId,
     required int profileId,
@@ -319,16 +311,6 @@ class HotftpApiClient {
     );
     _ensureSuccess(response, expectedStatusCodes: {200, 201});
     return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  Future<void> deleteDumpSchedule({
-    required String ownerId,
-    required int id,
-  }) async {
-    final response = await http.delete(
-      _uri('/api/v1/schedules/$id', {'ownerId': ownerId}),
-    );
-    _ensureSuccess(response, expectedStatusCodes: {204});
   }
 
   static Map<String, String> get _jsonHeaders => const {

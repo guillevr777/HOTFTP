@@ -39,7 +39,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      schedule = await getDumpScheduleForProfile.execute(ownerId, profile.id!);
+      schedule = await getDumpScheduleForProfile.execute(ownerId, profile);
       if (schedule != null) {
         enabled = schedule!.enabled;
         localPath = schedule!.localPath;
@@ -143,7 +143,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
         nextRunAt: nextRun,
       );
 
-      final id = await saveDumpSchedule.execute(updated);
+      final id = await saveDumpSchedule.execute(updated, profile);
       schedule = updated.copyWith(id: id);
       successMessage = enabled
           ? 'Volcado recurrente guardado'

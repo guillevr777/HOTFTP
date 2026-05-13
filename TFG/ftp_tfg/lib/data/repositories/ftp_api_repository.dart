@@ -10,20 +10,19 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
-import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
 import '../datasources/hotftp_api_client.dart';
+import '../../utils/thumbnail_utils.dart';
 
 class ApiFtpRepositoryImpl implements FtpRepository {
   final HotftpApiClient client;
-  final DatabaseHelper _db = DatabaseHelper.instance;
 
   ApiFtpRepositoryImpl(this.client);
 
   Map<String, dynamic> _profilePayload(FtpProfile profile, String ownerId) {
-    return {
-      'id': profile.id,
+    final payload = <String, dynamic>{
       'ownerId': ownerId,
+      'transportType': profile.transportType.name,
       'name': profile.name,
       'host': profile.host,
       'port': profile.port,
@@ -32,6 +31,10 @@ class ApiFtpRepositoryImpl implements FtpRepository {
       'useFTPS': profile.useFTPS,
       'passiveMode': profile.passiveMode,
     };
+    if (profile.id != null) {
+      payload['id'] = profile.id;
+    }
+    return payload;
   }
 
   String _ownerIdFor(FtpProfile profile) {
@@ -180,21 +183,33 @@ class ApiFtpRepositoryImpl implements FtpRepository {
       cacheDir.createSync(recursive: true);
     }
     final safeName = file.path.replaceAll('/', '_').replaceAll(':', '_');
-    final localPath = '${cacheDir.path}/${profile.id}_$safeName';
-    final localFile = File(localPath);
+    final thumbnailPath = '${cacheDir.path}/${profile.id}_$safeName.jpg';
+    final thumbFile = File(thumbnailPath);
 
-    if (localFile.existsSync()) {
-      return localPath;
+    if (thumbFile.existsSync()) {
+      return thumbnailPath;
     }
+
+    final sourcePath = '${cacheDir.path}/${profile.id}_$safeName.src';
 
     await client.downloadFileToPath(
       ownerId: _ownerIdFor(profile),
       profileId: profile.id ?? 0,
       remotePath: remotePath,
       fileName: file.name,
-      targetLocalPath: localPath,
+      targetLocalPath: sourcePath,
     );
-    return localPath;
+    try {
+      return await ThumbnailUtils.buildThumbnailFromFile(
+        sourcePath: sourcePath,
+        thumbnailPath: thumbnailPath,
+      );
+    } finally {
+      final srcFile = File(sourcePath);
+      if (srcFile.existsSync()) {
+        await srcFile.delete();
+      }
+    }
   }
 
   @override
@@ -241,18 +256,15 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     final payload = _profilePayload(profile, ownerId);
     final saved = await client.saveProfile(payload);
     final savedProfile = FtpProfile.fromMap(saved);
-    if (profile.id == null) {
-      await _db.insertProfile(savedProfile, ownerId);
-    } else {
-      await _db.updateProfile(savedProfile, ownerId);
-    }
     return savedProfile.id ?? profile.id ?? 0;
   }
 
   @override
-  Future<void> deleteProfile(int id, String ownerId) async {
-    await client.deleteProfile(ownerId: ownerId, profileId: id);
-    await _db.deleteProfile(id, ownerId);
+  Future<void> deleteProfile(FtpProfile profile, String ownerId) async {
+    await client.deleteProfile(
+      ownerId: ownerId,
+      profileId: profile.id ?? 0,
+    );
   }
 
   @override
@@ -267,36 +279,29 @@ class ApiFtpRepositoryImpl implements FtpRepository {
           .then((items) => items.map(SyncRecord.fromMap).toList());
 
   @override
-  Future<void> saveSyncRecord(SyncRecord record) async {
+  Future<void> saveSyncRecord(SyncRecord record, FtpProfile profile) async {
     await client.saveSyncRecord(record.toMap());
   }
 
   @override
-  Future<List<DumpSchedule>> getDumpSchedules(String ownerId) =>
-      client
-          .getDumpSchedules(ownerId)
-          .then((items) => items.map(DumpSchedule.fromMap).toList());
-
-  @override
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
-    int profileId,
+    FtpProfile profile,
   ) async {
     final schedule = await client.getDumpScheduleForProfile(
       ownerId: ownerId,
-      profileId: profileId,
+      profileId: profile.id ?? 0,
     );
     return schedule == null ? null : DumpSchedule.fromMap(schedule);
   }
 
   @override
-  Future<int> saveDumpSchedule(DumpSchedule schedule) async {
+  Future<int> saveDumpSchedule(
+    DumpSchedule schedule,
+    FtpProfile profile,
+  ) async {
     final saved = await client.saveDumpSchedule(schedule.toMap());
     final savedSchedule = DumpSchedule.fromMap(saved);
     return savedSchedule.id ?? schedule.id ?? 0;
   }
-
-  @override
-  Future<void> deleteDumpSchedule(int id, String ownerId) =>
-      client.deleteDumpSchedule(ownerId: ownerId, id: id);
 }

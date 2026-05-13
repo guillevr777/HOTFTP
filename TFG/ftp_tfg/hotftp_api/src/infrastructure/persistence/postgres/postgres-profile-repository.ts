@@ -6,6 +6,7 @@ import type { PostgresDatabase } from './postgres-database.js';
 type FtpProfileRow = {
   id: number;
   owner_id: string;
+  transport_type: 'local' | 'remote';
   name: string;
   host: string;
   port: number;
@@ -21,7 +22,7 @@ export class PostgresProfileRepository implements ProfileRepository {
   async list(ownerId: string): Promise<FtpProfile[]> {
     const result = await this.database.query<FtpProfileRow>(
       `
-      SELECT id, owner_id, name, host, port, username, password, use_ftps, passive_mode
+      SELECT id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
       FROM ftp_profiles
       WHERE owner_id = $1
       ORDER BY name ASC
@@ -37,12 +38,13 @@ export class PostgresProfileRepository implements ProfileRepository {
       const result = await this.database.query<FtpProfileRow>(
         `
         INSERT INTO ftp_profiles (
-          owner_id, name, host, port, username, password, use_ftps, passive_mode
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id, owner_id, name, host, port, username, password, use_ftps, passive_mode
+          owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
         `,
         [
           profile.ownerId,
+          profile.transportType,
           profile.name,
           profile.host,
           profile.port,
@@ -64,17 +66,19 @@ export class PostgresProfileRepository implements ProfileRepository {
     const result = await this.database.query<FtpProfileRow>(
       `
       UPDATE ftp_profiles
-      SET name = $1,
-          host = $2,
-          port = $3,
-          username = $4,
-          password = $5,
-          use_ftps = $6,
-          passive_mode = $7
-      WHERE id = $8 AND owner_id = $9
-      RETURNING id, owner_id, name, host, port, username, password, use_ftps, passive_mode
+      SET transport_type = $1,
+          name = $2,
+          host = $3,
+          port = $4,
+          username = $5,
+          password = $6,
+          use_ftps = $7,
+          passive_mode = $8
+      WHERE id = $9 AND owner_id = $10
+      RETURNING id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
       `,
       [
+        profile.transportType,
         profile.name,
         profile.host,
         profile.port,
@@ -98,7 +102,7 @@ export class PostgresProfileRepository implements ProfileRepository {
   async findById(ownerId: string, id: number): Promise<FtpProfile | null> {
     const result = await this.database.query<FtpProfileRow>(
       `
-      SELECT id, owner_id, name, host, port, username, password, use_ftps, passive_mode
+      SELECT id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
       FROM ftp_profiles
       WHERE owner_id = $1 AND id = $2
       LIMIT 1
@@ -123,6 +127,7 @@ export class PostgresProfileRepository implements ProfileRepository {
     return {
       id: row.id,
       ownerId: row.owner_id,
+      transportType: row.transport_type,
       name: row.name,
       host: row.host,
       port: row.port,

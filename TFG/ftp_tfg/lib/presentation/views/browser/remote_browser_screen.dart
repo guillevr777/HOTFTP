@@ -1,10 +1,12 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:universal_io/io.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/file_utils.dart';
 import '../../viewmodels/browser_view_model.dart';
 import '../history/history_screen.dart';
 import '../sync/sync_screen.dart';
@@ -39,7 +41,9 @@ class RemoteBrowserScreen extends StatelessWidget {
         recordFileVersion: context.read<IRecordFileVersionUseCase>(),
         profile: profile,
         ownerId: ownerId,
-      )..loadRemoteFiles(),
+      )
+        ..resetFilters()
+        ..loadRemoteFiles(),
       child: _RemoteBrowserBody(
         profile: profile,
         ownerId: ownerId,
@@ -151,15 +155,29 @@ class _RemoteBrowserBody extends StatelessWidget {
           Expanded(
             child: vm.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : vm.visibleRemoteFiles.isEmpty
+                : vm.error != null && vm.remoteFiles.isEmpty
+                ? _EmptyErrorState(
+                    message: vm.error!,
+                    onRetry: () => vm.loadRemoteFiles(forceRefresh: true),
+                  )
+                : vm.remoteFiles.isEmpty
                 ? const Center(
                     child: Text(
-                      'No hay resultados con los filtros actuales',
+                      'No hay archivos en esta carpeta',
                       style: TextStyle(color: AppTheme.onSurfaceMuted),
                     ),
                   )
+                : vm.visibleRemoteFiles.isEmpty
+                ? Center(
+                    child: Text(
+                      vm.searchQuery.isNotEmpty || vm.typeFilter != RemoteTypeFilter.all
+                          ? 'No hay resultados con los filtros actuales'
+                          : 'No hay archivos visibles',
+                      style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                    ),
+                  )
                 : RefreshIndicator(
-                    onRefresh: () => vm.loadRemoteFiles(),
+                    onRefresh: () => vm.loadRemoteFiles(forceRefresh: true),
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       itemCount: vm.visibleRemoteFiles.length,
@@ -169,6 +187,7 @@ class _RemoteBrowserBody extends StatelessWidget {
                         final file = vm.visibleRemoteFiles[i];
                         return _FileListTile(
                           file: file,
+                          remotePath: vm.currentRemotePath,
                           onTap: () async {
                             if (file.isDirectory) {
                               await vm.navigateRemote(file);
@@ -202,6 +221,53 @@ class _RemoteBrowserBody extends StatelessWidget {
               : vm.error!,
         ),
         backgroundColor: vm.error == null ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+}
+
+class _EmptyErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _EmptyErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_outlined,
+              size: 44,
+              color: AppTheme.onSurfaceMuted,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No se pudo cargar la carpeta',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.onSurfaceMuted),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -288,11 +354,13 @@ class _PathBar extends StatelessWidget {
 
 class _FileListTile extends StatelessWidget {
   final RemoteFile file;
+  final String remotePath;
   final VoidCallback onTap;
   final VoidCallback? onDownload;
 
   const _FileListTile({
     required this.file,
+    required this.remotePath,
     required this.onTap,
     required this.onDownload,
   });
@@ -300,7 +368,12 @@ class _FileListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(file.isDirectory ? Icons.folder : Icons.insert_drive_file),
+      leading: file.isDirectory
+          ? const Icon(Icons.folder)
+          : _FileLeading(
+              file: file,
+              remotePath: remotePath,
+            ),
       title: Text(file.name),
       onTap: onTap,
       trailing: onDownload == null
@@ -313,6 +386,84 @@ class _FileListTile extends StatelessWidget {
   }
 }
 
+class _FileLeading extends StatefulWidget {
+  final RemoteFile file;
+  final String remotePath;
 
+  const _FileLeading({
+    required this.file,
+    required this.remotePath,
+  });
 
+  @override
+  State<_FileLeading> createState() => _FileLeadingState();
+}
 
+class _FileLeadingState extends State<_FileLeading> {
+  String? _requestedPath;
+
+  @override
+  void didUpdateWidget(covariant _FileLeading oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path) {
+      _requestedPath = null;
+    }
+  }
+
+  void _scheduleThumbnailRequest() {
+    if (_requestedPath == widget.file.path) return;
+    _requestedPath = widget.file.path;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<BrowserViewModel>().requestThumbnail(
+        widget.file,
+        widget.remotePath,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<BrowserViewModel>();
+    final thumbPath = vm.thumbnails[widget.file.path];
+
+    if (thumbPath == null) {
+      if (FileUtils.isImage(widget.file.name)) {
+        _scheduleThumbnailRequest();
+      }
+      return Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          FileUtils.isImage(widget.file.name)
+              ? Icons.image_outlined
+              : Icons.insert_drive_file,
+          size: 22,
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(
+        File(thumbPath),
+        width: 48,
+        height: 48,
+        fit: BoxFit.cover,
+        cacheWidth: 96,
+        cacheHeight: 96,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: 48,
+          height: 48,
+          color: AppTheme.surfaceVariant,
+          child: const Icon(Icons.broken_image_outlined, size: 22),
+        ),
+      ),
+    );
+  }
+}

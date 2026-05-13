@@ -8,6 +8,7 @@ export const loginSchema = z.object({
 export const profileSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
   ownerId: z.string(),
+  transportType: z.enum(['local', 'remote']).default('remote'),
   name: z.string().min(1),
   host: z.string().min(1),
   port: z.number().int().positive(),

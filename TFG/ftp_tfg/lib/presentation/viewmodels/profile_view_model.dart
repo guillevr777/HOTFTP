@@ -42,8 +42,8 @@ class ProfileViewModel extends ChangeNotifier {
     await loadProfiles();
   }
 
-  Future<void> deleteProfile(int id) async {
-    await _deleteProfile.execute(id, ownerId);
+  Future<void> deleteProfile(FtpProfile profile) async {
+    await _deleteProfile.execute(profile, ownerId);
     await loadProfiles();
   }
 

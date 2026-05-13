@@ -138,7 +138,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
           profile: profile,
           onConnect: () => _connect(context, profile),
           onEdit: () => _openForm(context, profile),
-          onDelete: () => _confirmDelete(context, vm, profile),
+              onDelete: () => _confirmDelete(context, vm, profile),
         );
       },
     );
@@ -172,11 +172,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
     );
   }
 
-  void _confirmDelete(
-    BuildContext context,
-    ProfileViewModel vm,
-    FtpProfile profile,
-  ) {
+  void _confirmDelete(BuildContext context, ProfileViewModel vm, FtpProfile profile) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -190,7 +186,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              vm.deleteProfile(profile.id!);
+              vm.deleteProfile(profile);
             },
             child: const Text(
               'Eliminar',
@@ -253,6 +249,8 @@ class _ProfileCard extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      _TransportBadge(transportType: profile.transportType),
                     ],
                   ),
                 ),
@@ -280,6 +278,34 @@ class _ProfileCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TransportBadge extends StatelessWidget {
+  final FtpTransportType transportType;
+
+  const _TransportBadge({required this.transportType});
+
+  @override
+  Widget build(BuildContext context) {
+    final isLocal = transportType == FtpTransportType.local;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: (isLocal ? AppTheme.success : AppTheme.primary).withValues(
+          alpha: 0.12,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        isLocal ? 'Local directo' : 'Remoto via API',
+        style: TextStyle(
+          color: isLocal ? AppTheme.success : AppTheme.primary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

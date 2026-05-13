@@ -1,6 +1,7 @@
-﻿import '../entities/dump_schedule.dart';
-import '../repositories/ftp_repository.dart';
+import '../entities/dump_schedule.dart';
+import '../entities/ftp_profile.dart';
 import '../interfaces/i_get_dump_schedule_for_profile_use_case.dart';
+import '../repositories/ftp_repository.dart';
 
 class GetDumpScheduleForProfile implements IGetDumpScheduleForProfileUseCase {
   final FtpRepository repository;
@@ -8,10 +9,6 @@ class GetDumpScheduleForProfile implements IGetDumpScheduleForProfileUseCase {
   GetDumpScheduleForProfile(this.repository);
 
   @override
-  Future<DumpSchedule?> execute(String ownerId, int profileId) =>
-      repository.getDumpScheduleForProfile(ownerId, profileId);
+  Future<DumpSchedule?> execute(String ownerId, FtpProfile profile) =>
+      repository.getDumpScheduleForProfile(ownerId, profile);
 }
-
-
-
-

@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../domain/entities/ftp_profile.dart';
 import '../../viewmodels/profile_view_model.dart';
 import '../../../theme/app_theme.dart';
@@ -22,6 +23,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   bool _useFTPS = false;
   bool _passiveMode = true;
   bool _obscurePass = true;
+  FtpTransportType _transportType = FtpTransportType.remote;
 
   bool get isEditing => widget.profile != null;
 
@@ -36,22 +38,28 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
     _pass = TextEditingController(text: p?.password ?? '');
     _useFTPS = p?.useFTPS ?? false;
     _passiveMode = p?.passiveMode ?? true;
+    _transportType = p?.transportType ?? FtpTransportType.remote;
   }
 
   @override
   void dispose() {
-    _name.dispose(); _host.dispose(); _port.dispose();
-    _user.dispose(); _pass.dispose();
+    _name.dispose();
+    _host.dispose();
+    _port.dispose();
+    _user.dispose();
+    _pass.dispose();
     super.dispose();
   }
 
   FtpProfile _buildProfile() => FtpProfile(
         id: widget.profile?.id,
+        ownerId: widget.profile?.ownerId,
         name: _name.text.trim(),
         host: _host.text.trim(),
         port: int.tryParse(_port.text) ?? 21,
         username: _user.text.trim(),
         password: _pass.text,
+        transportType: _transportType,
         useFTPS: _useFTPS,
         passiveMode: _passiveMode,
       );
@@ -89,22 +97,38 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
             children: [
               _SectionLabel('Identificacion'),
               const SizedBox(height: 12),
-              _Field(controller: _name, label: 'Nombre del perfil', icon: Icons.label_outline,
-                  validator: (v) => v!.isEmpty ? 'Requerido' : null),
+              _Field(
+                controller: _name,
+                label: 'Nombre del perfil',
+                icon: Icons.label_outline,
+                validator: (v) => v!.isEmpty ? 'Requerido' : null,
+              ),
               const SizedBox(height: 16),
               _SectionLabel('Servidor'),
               const SizedBox(height: 12),
-              _Field(controller: _host, label: 'Host / IP', icon: Icons.dns_outlined,
-                  validator: (v) => v!.isEmpty ? 'Requerido' : null),
+              _Field(
+                controller: _host,
+                label: 'Host / IP',
+                icon: Icons.dns_outlined,
+                validator: (v) => v!.isEmpty ? 'Requerido' : null,
+              ),
               const SizedBox(height: 12),
-              _Field(controller: _port, label: 'Puerto', icon: Icons.settings_ethernet,
-                  keyboardType: TextInputType.number,
-                  validator: (v) => v!.isEmpty ? 'Requerido' : null),
+              _Field(
+                controller: _port,
+                label: 'Puerto',
+                icon: Icons.settings_ethernet,
+                keyboardType: TextInputType.number,
+                validator: (v) => v!.isEmpty ? 'Requerido' : null,
+              ),
               const SizedBox(height: 16),
               _SectionLabel('Credenciales'),
               const SizedBox(height: 12),
-              _Field(controller: _user, label: 'Usuario', icon: Icons.person_outline,
-                  validator: (v) => v!.isEmpty ? 'Requerido' : null),
+              _Field(
+                controller: _user,
+                label: 'Usuario',
+                icon: Icons.person_outline,
+                validator: (v) => v!.isEmpty ? 'Requerido' : null,
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _pass,
@@ -113,8 +137,13 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                   labelText: 'Contrasena',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                    icon: Icon(
+                      _obscurePass
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePass = !_obscurePass),
                   ),
                 ),
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
@@ -125,9 +154,37 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               Card(
                 child: Column(
                   children: [
+                    DropdownButtonFormField<FtpTransportType>(
+                      initialValue: _transportType,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de conexion',
+                        prefixIcon: Icon(Icons.swap_horiz),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: FtpTransportType.local,
+                          child: Text('FTP local directo'),
+                        ),
+                        DropdownMenuItem(
+                          value: FtpTransportType.remote,
+                          child: Text('FTP remoto via API'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() => _transportType = value);
+                      },
+                    ),
+                    const Divider(height: 1),
                     SwitchListTile(
                       title: const Text('Usar FTPS (SSL/TLS)'),
-                      subtitle: const Text('Cifrado de la conexion', style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
+                      subtitle: const Text(
+                        'Cifrado de la conexion',
+                        style: TextStyle(
+                          color: AppTheme.onSurfaceMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                       value: _useFTPS,
                       activeThumbColor: AppTheme.primary,
                       onChanged: (v) => setState(() => _useFTPS = v),
@@ -135,7 +192,13 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                     const Divider(height: 1),
                     SwitchListTile(
                       title: const Text('Modo pasivo'),
-                      subtitle: const Text('Recomendado para la mayoria de redes', style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
+                      subtitle: const Text(
+                        'Recomendado para la mayoria de redes',
+                        style: TextStyle(
+                          color: AppTheme.onSurfaceMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                       value: _passiveMode,
                       activeThumbColor: AppTheme.primary,
                       onChanged: (v) => setState(() => _passiveMode = v),
@@ -147,7 +210,11 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               OutlinedButton.icon(
                 onPressed: vm.isTesting ? null : () => _testConnection(vm),
                 icon: vm.isTesting
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.wifi_tethering),
                 label: Text(vm.isTesting ? 'Probando...' : 'Probar conexion'),
                 style: OutlinedButton.styleFrom(
@@ -173,6 +240,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
+
   @override
   Widget build(BuildContext context) => Text(
         text.toUpperCase(),
@@ -211,7 +279,3 @@ class _Field extends StatelessWidget {
         validator: validator,
       );
 }
-
-
-
-

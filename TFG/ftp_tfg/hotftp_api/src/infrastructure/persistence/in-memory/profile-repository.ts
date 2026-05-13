@@ -7,6 +7,7 @@ export class InMemoryProfileRepository implements ProfileRepository {
     {
       id: 1,
       ownerId: 'demo-owner',
+      transportType: 'remote',
       name: 'Servidor demo',
       host: '127.0.0.1',
       port: 21,
