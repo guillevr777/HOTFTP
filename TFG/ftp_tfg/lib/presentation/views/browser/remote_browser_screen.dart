@@ -1,5 +1,13 @@
-﻿import 'package:flutter/foundation.dart';
+﻿import 'dart:convert';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:video_player/video_player.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_io/io.dart';
 
@@ -104,7 +112,9 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 72,
         title: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.profile.name),
@@ -274,8 +284,9 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
       MaterialPageRoute(
         builder: (_) => _FilePreviewScreen(
           file: file,
-          thumbnailPath: vm.thumbnails[file.path],
           onDownload: () => vm.downloadFile(file),
+          profile: vm.profile,
+          downloadFileUseCase: context.read<IDownloadFileUseCase>(),
         ),
       ),
     );
@@ -585,20 +596,24 @@ class _GridPreviewState extends State<_GridPreview> {
     if (widget.file.isDirectory) {
       return _FileFrame(
         color: color,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 58, color: color),
-            const SizedBox(height: 8),
-            const Text(
-              'Carpeta',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.onSurfaceMuted,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 58, color: color),
+              const SizedBox(height: 6),
+              const Text(
+                'Carpeta',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.onSurfaceMuted,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -610,30 +625,34 @@ class _GridPreviewState extends State<_GridPreview> {
       }
       return _FileFrame(
         color: color,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 54, color: color),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                FileUtils.extensionOf(widget.file.name).toUpperCase().isEmpty
-                    ? 'FILE'
-                    : FileUtils.extensionOf(widget.file.name).toUpperCase(),
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 52, color: color),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  FileUtils.extensionOf(widget.file.name).toUpperCase().isEmpty
+                      ? 'FILE'
+                      : FileUtils.extensionOf(widget.file.name).toUpperCase(),
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
                 ),
               ),
-            ),
             ],
           ),
+        ),
       );
     }
 
@@ -722,39 +741,47 @@ class _FileFrame extends StatelessWidget {
   }
 }
 
-class _FilePreviewScreen extends StatelessWidget {
+class _FilePreviewScreen extends StatefulWidget {
   final RemoteFile file;
-  final String? thumbnailPath;
   final Future<void> Function() onDownload;
+  final FtpProfile profile;
+  final IDownloadFileUseCase downloadFileUseCase;
 
   const _FilePreviewScreen({
     required this.file,
-    required this.thumbnailPath,
     required this.onDownload,
+    required this.profile,
+    required this.downloadFileUseCase,
   });
 
   @override
+  State<_FilePreviewScreen> createState() => _FilePreviewScreenState();
+}
+
+class _FilePreviewScreenState extends State<_FilePreviewScreen> {
+  late final Future<String?> _previewFileFuture;
+  late final _PreviewKind _previewKind;
+
+  @override
+  void initState() {
+    super.initState();
+    _previewKind = _previewKindFor(widget.file.name);
+    _previewFileFuture = _loadPreviewFile();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final icon = FileUtils.fileIcon(file.name, isDirectory: file.isDirectory);
-    final color = FileUtils.fileColor(file.name, isDirectory: file.isDirectory);
+    final icon = FileUtils.fileIcon(widget.file.name, isDirectory: widget.file.isDirectory);
+    final color = FileUtils.fileColor(widget.file.name, isDirectory: widget.file.isDirectory);
+    final isMedia = _previewKind != _PreviewKind.other && !widget.file.isDirectory;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      extendBodyBehindAppBar: !file.isDirectory &&
-          thumbnailPath != null &&
-          File(thumbnailPath!).existsSync(),
+      backgroundColor: isMedia ? Colors.black : AppTheme.background,
+      extendBodyBehindAppBar: isMedia,
       appBar: AppBar(
-        title: Text(file.name),
-        backgroundColor: !file.isDirectory &&
-                thumbnailPath != null &&
-                File(thumbnailPath!).existsSync()
-            ? Colors.black.withValues(alpha: 0.35)
-            : null,
-        foregroundColor: !file.isDirectory &&
-                thumbnailPath != null &&
-                File(thumbnailPath!).existsSync()
-            ? Colors.white
-            : null,
+        title: Text(widget.file.name),
+        backgroundColor: isMedia ? Colors.black.withValues(alpha: 0.35) : null,
+        foregroundColor: isMedia ? Colors.white : null,
         elevation: 0,
         actions: [
           IconButton(
@@ -762,11 +789,11 @@ class _FilePreviewScreen extends StatelessWidget {
             onPressed: () => _showDetailsSheet(context),
             icon: const Icon(Icons.info_outline),
           ),
-          if (!file.isDirectory)
+          if (!widget.file.isDirectory)
             IconButton(
               tooltip: 'Descargar',
               onPressed: () async {
-                await onDownload();
+                await widget.onDownload();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Descarga iniciada')),
@@ -774,10 +801,10 @@ class _FilePreviewScreen extends StatelessWidget {
                 }
               },
               icon: const Icon(Icons.download),
-          ),
+            ),
         ],
       ),
-      body: file.isDirectory
+      body: widget.file.isDirectory
           ? SafeArea(
               child: CustomScrollView(
                 slivers: [
@@ -813,7 +840,7 @@ class _FilePreviewScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            file.name,
+                            widget.file.name,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 22,
@@ -823,12 +850,10 @@ class _FilePreviewScreen extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(
                             FileUtils.fileCategory(
-                              file.name,
-                              isDirectory: file.isDirectory,
+                              widget.file.name,
+                              isDirectory: widget.file.isDirectory,
                             ),
-                            style: const TextStyle(
-                              color: AppTheme.onSurfaceMuted,
-                            ),
+                            style: const TextStyle(color: AppTheme.onSurfaceMuted),
                           ),
                         ],
                       ),
@@ -838,58 +863,111 @@ class _FilePreviewScreen extends StatelessWidget {
                 ],
               ),
             )
-          : (thumbnailPath != null && File(thumbnailPath!).existsSync())
-          ? SafeArea(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.file(
-                    File(thumbnailPath!),
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                  ),
-                ],
-              ),
-            )
-          : SafeArea(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        gradient: LinearGradient(
-                          colors: [
-                            color.withValues(alpha: 0.22),
-                            AppTheme.surfaceVariant,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Center(
-                          child: Icon(icon, size: 120, color: color),
-                        ),
+          : FutureBuilder<String?>(
+              future: _previewFileFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'No se pudo preparar la vista previa',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
-                  ),
-                ),
-              ),
+                  );
+                }
+
+                final previewPath = snapshot.data;
+                if (previewPath == null || !File(previewPath).existsSync()) {
+                  return _buildOtherFileView(icon, color);
+                }
+
+                return switch (_previewKind) {
+                  _PreviewKind.image => _ImagePreviewViewport(filePath: previewPath),
+                  _PreviewKind.video => _VideoPreviewViewport(filePath: previewPath),
+                  _PreviewKind.pdf => SafeArea(
+                      child: SfPdfViewer.file(File(previewPath)),
+                    ),
+                  _PreviewKind.other => _buildOtherFileView(icon, color),
+                };
+              },
             ),
     );
   }
 
+  Widget _buildOtherFileView(IconData icon, Color color) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.22),
+                    AppTheme.surfaceVariant,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.35),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Center(
+                  child: Icon(icon, size: 120, color: color),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  _PreviewKind _previewKindFor(String fileName) {
+    if (FileUtils.isImage(fileName)) return _PreviewKind.image;
+    if (FileUtils.isVideo(fileName)) return _PreviewKind.video;
+    if (FileUtils.extensionOf(fileName) == 'pdf') return _PreviewKind.pdf;
+    return _PreviewKind.other;
+  }
+
+  Future<String?> _loadPreviewFile() async {
+    if (_previewKind == _PreviewKind.other) return null;
+    if (kIsWeb && _previewKind == _PreviewKind.video) return null;
+
+    final tempDir = await getTemporaryDirectory();
+    final previewDir = Directory(p.join(tempDir.path, 'hotftp_preview_cache'));
+    await previewDir.create(recursive: true);
+
+    final hashInput = '${widget.file.path}|${widget.file.size}|${widget.file.modifiedAt?.toIso8601String() ?? ''}';
+    final key = sha1.convert(utf8.encode(hashInput)).toString();
+    final ext = FileUtils.extensionOf(widget.file.name).isEmpty
+        ? 'bin'
+        : FileUtils.extensionOf(widget.file.name);
+    final previewPath = p.join(previewDir.path, '$key.$ext');
+    final previewFile = File(previewPath);
+    if (await previewFile.exists()) return previewPath;
+
+    await widget.downloadFileUseCase.execute(widget.file, previewPath, widget.profile);
+    return previewPath;
+  }
+
   Future<void> _showDetailsSheet(BuildContext context) async {
-    final ext = FileUtils.extensionOf(file.name).isEmpty
+    final ext = FileUtils.extensionOf(widget.file.name).isEmpty
         ? 'N/A'
-        : FileUtils.extensionOf(file.name).toUpperCase();
+        : FileUtils.extensionOf(widget.file.name).toUpperCase();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -923,7 +1001,7 @@ class _FilePreviewScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            file.name,
+                            widget.file.name,
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppTheme.onSurfaceMuted,
@@ -935,7 +1013,7 @@ class _FilePreviewScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _DetailRow(
                       label: 'Nombre',
-                      value: file.name,
+                      value: widget.file.name,
                       icon: Icons.badge_outlined,
                     ),
                     const SizedBox(height: 12),
@@ -948,31 +1026,31 @@ class _FilePreviewScreen extends StatelessWidget {
                     _DetailRow(
                       label: 'Tipo',
                       value: FileUtils.fileCategory(
-                        file.name,
-                        isDirectory: file.isDirectory,
+                        widget.file.name,
+                        isDirectory: widget.file.isDirectory,
                       ),
                       icon: Icons.category_outlined,
                     ),
                     const SizedBox(height: 12),
                     _DetailRow(
                       label: 'Tamaño',
-                      value: file.isDirectory
+                      value: widget.file.isDirectory
                           ? 'Carpeta'
-                          : FileUtils.formatBytes(file.size),
+                          : FileUtils.formatBytes(widget.file.size),
                       icon: Icons.sd_storage_outlined,
                     ),
                     const SizedBox(height: 12),
                     _DetailRow(
                       label: 'Fecha',
-                      value: file.modifiedAt == null
+                      value: widget.file.modifiedAt == null
                           ? 'Sin fecha'
-                          : '${file.modifiedAt!.day.toString().padLeft(2, '0')}/${file.modifiedAt!.month.toString().padLeft(2, '0')}/${file.modifiedAt!.year} ${file.modifiedAt!.hour.toString().padLeft(2, '0')}:${file.modifiedAt!.minute.toString().padLeft(2, '0')}',
+                          : '${widget.file.modifiedAt!.day.toString().padLeft(2, '0')}/${widget.file.modifiedAt!.month.toString().padLeft(2, '0')}/${widget.file.modifiedAt!.year} ${widget.file.modifiedAt!.hour.toString().padLeft(2, '0')}:${widget.file.modifiedAt!.minute.toString().padLeft(2, '0')}',
                       icon: Icons.schedule_outlined,
                     ),
                     const SizedBox(height: 12),
                     _DetailRow(
                       label: 'Ruta',
-                      value: file.path,
+                      value: widget.file.path,
                       icon: Icons.route_outlined,
                     ),
                   ],
@@ -983,6 +1061,233 @@ class _FilePreviewScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+enum _PreviewKind { image, video, pdf, other }
+
+class _ImagePreviewViewport extends StatefulWidget {
+  final String filePath;
+
+  const _ImagePreviewViewport({required this.filePath});
+
+  @override
+  State<_ImagePreviewViewport> createState() => _ImagePreviewViewportState();
+}
+
+class _ImagePreviewViewportState extends State<_ImagePreviewViewport> {
+  late final Future<ui.Size> _imageSizeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageSizeFuture = _loadImageSize(widget.filePath);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ui.Size>(
+      future: _imageSizeFuture,
+      builder: (context, snapshot) {
+        final imageSize = snapshot.data ?? const ui.Size(1, 1);
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final screenAspect = constraints.maxWidth / constraints.maxHeight;
+            final imageAspect = imageSize.width / imageSize.height;
+            final fit = imageAspect > screenAspect
+                ? BoxFit.fitWidth
+                : BoxFit.fitHeight;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.file(
+                  File(widget.filePath),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.low,
+                ),
+                Container(color: Colors.black.withValues(alpha: 0.25)),
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: FittedBox(
+                      fit: fit,
+                      child: SizedBox(
+                        width: imageSize.width,
+                        height: imageSize.height,
+                        child: Image.file(
+                          File(widget.filePath),
+                          fit: BoxFit.fill,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<ui.Size> _loadImageSize(String imagePath) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frameInfo = await codec.getNextFrame();
+    final size = ui.Size(
+      frameInfo.image.width.toDouble(),
+      frameInfo.image.height.toDouble(),
+    );
+    codec.dispose();
+    return size;
+  }
+}
+
+class _VideoPreviewViewport extends StatefulWidget {
+  final String filePath;
+
+  const _VideoPreviewViewport({required this.filePath});
+
+  @override
+  State<_VideoPreviewViewport> createState() => _VideoPreviewViewportState();
+}
+
+class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
+  late final VideoPlayerController _controller;
+  late final Future<void> _initFuture;
+  bool _controlsVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.filePath));
+    _initFuture = _controller.initialize().then((_) {
+      _controller.setLooping(true);
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (!_controller.value.isInitialized) return;
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+      } else {
+        _controller.play();
+      }
+      _controlsVisible = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            !_controller.value.isInitialized) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _controlsVisible = !_controlsVisible;
+            });
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Colors.black),
+              Center(
+                child: AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: VideoPlayer(_controller),
+                ),
+              ),
+              if (_controlsVisible)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(
+                    top: false,
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          VideoProgressIndicator(
+                            _controller,
+                            allowScrubbing: true,
+                            colors: VideoProgressColors(
+                              playedColor: Colors.white,
+                              bufferedColor: Colors.white54,
+                              backgroundColor: Colors.white24,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: _togglePlay,
+                                icon: Icon(
+                                  _controller.value.isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_fill,
+                                  color: Colors.white,
+                                  size: 36,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Vídeo',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                _formatDuration(_controller.value.position),
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '${duration.inHours}:$minutes:$seconds';
   }
 }
 
@@ -1055,5 +1360,9 @@ class _PathBar extends StatelessWidget {
     );
   }
 }
+
+
+
+
 
 
