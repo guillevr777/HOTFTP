@@ -16,7 +16,7 @@ class HybridFtpRepositoryImpl implements FtpRepository {
   });
 
   bool _isLocal(FtpProfile profile) =>
-      profile.transportType == FtpTransportType.local;
+      profile.transportType == FtpTransportType.direct;
 
   FtpRepository _repositoryFor(FtpProfile profile) =>
       _isLocal(profile) ? localRepository : remoteRepository;

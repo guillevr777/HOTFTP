@@ -1,24 +1,33 @@
 import 'package:universal_io/io.dart';
 
 import '../interfaces/ftp_datasource.dart';
+import 'hotftp_sftp_client.dart';
 import 'hotftp_ftp_client.dart';
 
 class FtpRealDatasource implements FtpDatasource {
   final HotftpFtpClient _client;
+  final HotftpSftpClient _sftpClient;
 
-  FtpRealDatasource({HotftpFtpClient? client})
-      : _client = client ?? HotftpFtpClient();
+  FtpRealDatasource({HotftpFtpClient? client, HotftpSftpClient? sftpClient})
+      : _client = client ?? HotftpFtpClient(),
+        _sftpClient = sftpClient ?? HotftpSftpClient();
+
+  bool _usesSftp(Map<String, dynamic> config) => '${config['protocol']}' == 'sftp';
 
   @override
   Future<bool> testConnection(Map<String, dynamic> profile) =>
-      _client.testConnection(profile);
+      _usesSftp(profile)
+          ? _sftpClient.testConnection(profile)
+          : _client.testConnection(profile);
 
   @override
   Future<List<Map<String, dynamic>>> listRemoteFiles(
     String path,
     Map<String, dynamic> config,
   ) =>
-      _client.listRemoteFiles(path, config);
+      _usesSftp(config)
+          ? _sftpClient.listRemoteFiles(path, config)
+          : _client.listRemoteFiles(path, config);
 
   @override
   Future<List<String>> listLocalFiles(String path) async {
@@ -37,7 +46,9 @@ class FtpRealDatasource implements FtpDatasource {
     String remotePath,
     Map<String, dynamic> config,
   ) =>
-      _client.uploadFile(localFilePath, remotePath, config);
+      _usesSftp(config)
+          ? _sftpClient.uploadFile(localFilePath, remotePath, config)
+          : _client.uploadFile(localFilePath, remotePath, config);
 
   @override
   Future<void> downloadFile(
@@ -60,12 +71,19 @@ class FtpRealDatasource implements FtpDatasource {
     String targetLocalPath,
     Map<String, dynamic> config,
   ) =>
-      _client.downloadFileToPath(
-        remoteFileName,
-        remoteDirectory,
-        targetLocalPath,
-        config,
-      );
+      _usesSftp(config)
+          ? _sftpClient.downloadFileToPath(
+              remoteFileName,
+              remoteDirectory,
+              targetLocalPath,
+              config,
+            )
+          : _client.downloadFileToPath(
+              remoteFileName,
+              remoteDirectory,
+              targetLocalPath,
+              config,
+            );
 
   @override
   Future<void> deleteRemoteFile(
@@ -73,5 +91,11 @@ class FtpRealDatasource implements FtpDatasource {
     String remoteDirectory,
     Map<String, dynamic> config,
   ) =>
-      _client.deleteRemoteFile(remoteFileName, remoteDirectory, config);
+      _usesSftp(config)
+          ? _sftpClient.deleteRemoteFile(
+              remoteFileName,
+              remoteDirectory,
+              config,
+            )
+          : _client.deleteRemoteFile(remoteFileName, remoteDirectory, config);
 }

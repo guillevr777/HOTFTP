@@ -1,5 +1,6 @@
 import type { FtpProfile } from '../../../domain/entities/ftp-profile.js';
 import type { ProfileRepository } from '../../../domain/repositories/profile-repository.js';
+import { resolveTransportType } from '../../../domain/services/connection-route.js';
 
 export class InMemoryProfileRepository implements ProfileRepository {
   private nextId = 2;
@@ -7,13 +8,13 @@ export class InMemoryProfileRepository implements ProfileRepository {
     {
       id: 1,
       ownerId: 'demo-owner',
-      transportType: 'remote',
+      transportType: 'direct',
+      protocol: 'ftp',
       name: 'Servidor demo',
       host: '127.0.0.1',
       port: 21,
       username: 'demo',
       password: 'demo',
-      useFTPS: false,
       passiveMode: true,
     },
   ];
@@ -23,15 +24,19 @@ export class InMemoryProfileRepository implements ProfileRepository {
   }
 
   async save(profile: FtpProfile): Promise<FtpProfile> {
+    const normalized: FtpProfile = {
+      ...profile,
+      transportType: resolveTransportType(profile.host),
+    };
     const index = this.profiles.findIndex(
       (item) => item.id === profile.id && item.ownerId === profile.ownerId,
     );
     if (index >= 0) {
-      this.profiles[index] = profile;
-      return profile;
+      this.profiles[index] = normalized;
+      return normalized;
     }
 
-    const next = profile.id ? profile : { ...profile, id: this.nextId++ };
+    const next = normalized.id ? normalized : { ...normalized, id: this.nextId++ };
     this.profiles.push(next);
     return next;
   }

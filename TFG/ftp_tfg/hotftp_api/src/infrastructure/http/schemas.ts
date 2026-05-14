@@ -8,13 +8,13 @@ export const loginSchema = z.object({
 export const profileSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
   ownerId: z.string(),
-  transportType: z.enum(['local', 'remote']).default('remote'),
+  transportType: z.enum(['direct', 'api']).default('api'),
+  protocol: z.enum(['ftp', 'sftp', 'ftps']).default('ftp'),
   name: z.string().min(1),
   host: z.string().min(1),
   port: z.number().int().positive(),
   username: z.string().min(1),
   password: z.string().min(1),
-  useFTPS: z.boolean().default(false),
   passiveMode: z.boolean().default(true),
 });
 

@@ -78,7 +78,7 @@ class BrowserViewModel extends ChangeNotifier {
   RemoteSortField sortField = RemoteSortField.name;
   SortDirection sortDirection = SortDirection.asc;
   RemoteTypeFilter typeFilter = RemoteTypeFilter.all;
-  RemoteFileViewMode displayMode = RemoteFileViewMode.list;
+  RemoteFileViewMode displayMode = RemoteFileViewMode.grid;
   RemoteGridDensity gridDensity = RemoteGridDensity.medium;
 
   List<RemoteFile> get visibleRemoteFiles {
@@ -258,7 +258,7 @@ class BrowserViewModel extends ChangeNotifier {
   }
 
   Future<void> _trackFileVersions() async {
-    if (profile.id == null || profile.transportType == FtpTransportType.local) {
+    if (profile.id == null || profile.transportType == FtpTransportType.direct) {
       return;
     }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {

@@ -1,12 +1,14 @@
 import type { FtpProfile } from '../../../domain/entities/ftp-profile.js';
 import type { ProfileRepository } from '../../../domain/repositories/profile-repository.js';
+import { resolveTransportType } from '../../../domain/services/connection-route.js';
 import { HttpError } from '../../../shared/http/http-error.js';
 import type { PostgresDatabase } from './postgres-database.js';
 
 type FtpProfileRow = {
   id: number;
   owner_id: string;
-  transport_type: 'local' | 'remote';
+  transport_type: string;
+  protocol: string;
   name: string;
   host: string;
   port: number;
@@ -22,7 +24,7 @@ export class PostgresProfileRepository implements ProfileRepository {
   async list(ownerId: string): Promise<FtpProfile[]> {
     const result = await this.database.query<FtpProfileRow>(
       `
-      SELECT id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
+      SELECT id, owner_id, transport_type, protocol, name, host, port, username, password, use_ftps, passive_mode
       FROM ftp_profiles
       WHERE owner_id = $1
       ORDER BY name ASC
@@ -34,24 +36,30 @@ export class PostgresProfileRepository implements ProfileRepository {
   }
 
   async save(profile: FtpProfile): Promise<FtpProfile> {
+    const normalized = {
+      ...profile,
+      transportType: resolveTransportType(profile.host),
+    };
+
     if (profile.id == null) {
       const result = await this.database.query<FtpProfileRow>(
         `
         INSERT INTO ftp_profiles (
-          owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
+          owner_id, transport_type, protocol, name, host, port, username, password, use_ftps, passive_mode
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, owner_id, transport_type, protocol, name, host, port, username, password, use_ftps, passive_mode
         `,
         [
-          profile.ownerId,
-          profile.transportType,
-          profile.name,
-          profile.host,
-          profile.port,
-          profile.username,
-          profile.password,
-          profile.useFTPS,
-          profile.passiveMode,
+          normalized.ownerId,
+          normalized.transportType,
+          normalized.protocol,
+          normalized.name,
+          normalized.host,
+          normalized.port,
+          normalized.username,
+          normalized.password,
+          normalized.protocol === 'ftps',
+          normalized.passiveMode,
         ],
       );
 
@@ -67,25 +75,27 @@ export class PostgresProfileRepository implements ProfileRepository {
       `
       UPDATE ftp_profiles
       SET transport_type = $1,
-          name = $2,
-          host = $3,
-          port = $4,
-          username = $5,
-          password = $6,
-          use_ftps = $7,
-          passive_mode = $8
-      WHERE id = $9 AND owner_id = $10
-      RETURNING id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
+          protocol = $2,
+          name = $3,
+          host = $4,
+          port = $5,
+          username = $6,
+          password = $7,
+          use_ftps = $8,
+          passive_mode = $9
+      WHERE id = $10 AND owner_id = $11
+      RETURNING id, owner_id, transport_type, protocol, name, host, port, username, password, use_ftps, passive_mode
       `,
       [
-        profile.transportType,
-        profile.name,
-        profile.host,
-        profile.port,
-        profile.username,
-        profile.password,
-        profile.useFTPS,
-        profile.passiveMode,
+        normalized.transportType,
+        normalized.protocol,
+        normalized.name,
+        normalized.host,
+        normalized.port,
+        normalized.username,
+        normalized.password,
+        normalized.protocol === 'ftps',
+        normalized.passiveMode,
         profile.id,
         profile.ownerId,
       ],
@@ -102,7 +112,7 @@ export class PostgresProfileRepository implements ProfileRepository {
   async findById(ownerId: string, id: number): Promise<FtpProfile | null> {
     const result = await this.database.query<FtpProfileRow>(
       `
-      SELECT id, owner_id, transport_type, name, host, port, username, password, use_ftps, passive_mode
+      SELECT id, owner_id, transport_type, protocol, name, host, port, username, password, use_ftps, passive_mode
       FROM ftp_profiles
       WHERE owner_id = $1 AND id = $2
       LIMIT 1
@@ -127,13 +137,19 @@ export class PostgresProfileRepository implements ProfileRepository {
     return {
       id: row.id,
       ownerId: row.owner_id,
-      transportType: row.transport_type,
+      transportType:
+        row.transport_type === 'remote' || row.transport_type === 'api'
+          ? 'api'
+          : 'direct',
+      protocol:
+        row.protocol === 'sftp' || row.protocol === 'ftps'
+          ? row.protocol
+          : 'ftp',
       name: row.name,
       host: row.host,
       port: row.port,
       username: row.username,
       password: row.password,
-      useFTPS: row.use_ftps,
       passiveMode: row.passive_mode,
     };
   }

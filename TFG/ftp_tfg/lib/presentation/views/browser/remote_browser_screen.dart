@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_io/io.dart';
@@ -93,7 +93,7 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     final vm = context.watch<BrowserViewModel>();
     final displayedFiles = vm.displayedRemoteFiles;
     final listSignature =
-        '${vm.currentRemotePath}|${vm.searchQuery}|${vm.sortField.name}|${vm.sortDirection.name}|${vm.typeFilter.name}|${vm.displayMode.name}|${vm.gridDensity.name}';
+        '${vm.currentRemotePath}|${vm.searchQuery}|${vm.sortField.name}|${vm.sortDirection.name}|${vm.typeFilter.name}';
     if (_lastListSignature != listSignature) {
       _lastListSignature = listSignature;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -216,98 +216,44 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
                   )
                 : RefreshIndicator(
                     onRefresh: () => vm.loadRemoteFiles(forceRefresh: true),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (vm.displayMode == RemoteFileViewMode.grid) {
-                          return GridView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(12),
-                            cacheExtent: 0,
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: _gridCrossAxisCount(
-                                    constraints.maxWidth,
-                                    vm.gridDensity,
-                                  ),
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: _gridChildAspectRatio(
-                                    vm.gridDensity,
-                                  ),
-                                ),
-                            itemCount:
-                                displayedFiles.length +
-                                (vm.hasMoreRemoteFiles ? 1 : 0),
-                            itemBuilder: (context, i) {
-                              if (i >= displayedFiles.length) {
-                                return const Center(
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                );
-                              }
-                              final file = displayedFiles[i];
-                              return _FileGridTile(
-                                key: ValueKey(file.path),
-                                file: file,
-                                remotePath: vm.currentRemotePath,
-                                density: vm.gridDensity,
-                                onTap: () async {
-                                  if (file.isDirectory) {
-                                    await vm.navigateRemote(file);
-                                  }
-                                },
-                                onDownload: file.isDirectory
-                                    ? null
-                                    : () => _download(context, vm, file),
-                              );
-                            },
+                    child: GridView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(12),
+                      cacheExtent: 0,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 0.9,
+                      ),
+                      itemCount:
+                          displayedFiles.length + (vm.hasMoreRemoteFiles ? 1 : 0),
+                      itemBuilder: (context, i) {
+                        if (i >= displayedFiles.length) {
+                          return const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           );
                         }
-
-                        return ListView.separated(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          cacheExtent: 0,
-                          itemCount:
-                              displayedFiles.length +
-                              (vm.hasMoreRemoteFiles ? 1 : 0),
-                          separatorBuilder: (context, index) =>
-                              const Divider(height: 1, indent: 56),
-                          itemBuilder: (context, i) {
-                            if (i >= displayedFiles.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 20),
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                ),
-                              );
+                        final file = displayedFiles[i];
+                        return _FileGridTile(
+                          key: ValueKey(file.path),
+                          file: file,
+                          remotePath: vm.currentRemotePath,
+                          onTap: () async {
+                            if (file.isDirectory) {
+                              await vm.navigateRemote(file);
+                              return;
                             }
-                            final file = displayedFiles[i];
-                            return _FileListTile(
-                              key: ValueKey(file.path),
-                              file: file,
-                              remotePath: vm.currentRemotePath,
-                              onTap: () async {
-                                if (file.isDirectory) {
-                                  await vm.navigateRemote(file);
-                                }
-                              },
-                              onDownload: file.isDirectory
-                                  ? null
-                                  : () => _download(context, vm, file),
-                            );
+                            if (!context.mounted) return;
+                            await _openPreview(context, vm, file);
                           },
+                          onDownload: file.isDirectory
+                              ? null
+                              : () => _download(context, vm, file),
                         );
                       },
                     ),
@@ -318,7 +264,24 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     );
   }
 
-  void _download(
+  Future<void> _openPreview(
+    BuildContext context,
+    BrowserViewModel vm,
+    RemoteFile file,
+  ) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _FilePreviewScreen(
+          file: file,
+          thumbnailPath: vm.thumbnails[file.path],
+          onDownload: () => vm.downloadFile(file),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _download(
     BuildContext context,
     BrowserViewModel vm,
     RemoteFile file,
@@ -396,97 +359,65 @@ class _FilterBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 720;
-              final searchField = TextField(
-                onChanged: vm.setSearchQuery,
-                decoration: InputDecoration(
-                  hintText: 'Buscar por nombre',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: AppTheme.surfaceVariant,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          TextField(
+            onChanged: vm.setSearchQuery,
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: AppTheme.surfaceVariant,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: vm.toggleSortDirection,
+                icon: Icon(
+                  vm.sortDirection == SortDirection.asc
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
                 ),
-              );
-
-              final viewToggle = ToggleButtons(
-                isSelected: [
-                  vm.displayMode == RemoteFileViewMode.list,
-                  vm.displayMode == RemoteFileViewMode.grid,
-                ],
-                onPressed: (index) {
-                  vm.setDisplayMode(
-                    index == 0
-                        ? RemoteFileViewMode.list
-                        : RemoteFileViewMode.grid,
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                constraints: const BoxConstraints(minHeight: 44, minWidth: 48),
-                children: const [
-                  Tooltip(
-                    message: 'Vista de lista',
-                    child: Icon(Icons.view_agenda_outlined),
+                label: Text(
+                  switch (vm.sortField) {
+                    RemoteSortField.name => 'Nombre',
+                    RemoteSortField.date => 'Fecha',
+                    RemoteSortField.size => 'TamaÃ±o',
+                    RemoteSortField.type => 'Tipo',
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<RemoteSortField>(
+                value: vm.sortField,
+                items: const [
+                  DropdownMenuItem(
+                    value: RemoteSortField.name,
+                    child: Text('Nombre'),
                   ),
-                  Tooltip(
-                    message: 'Vista en rejilla',
-                    child: Icon(Icons.grid_view_outlined),
+                  DropdownMenuItem(
+                    value: RemoteSortField.date,
+                    child: Text('Fecha'),
+                  ),
+                  DropdownMenuItem(
+                    value: RemoteSortField.size,
+                    child: Text('TamaÃ±o'),
+                  ),
+                  DropdownMenuItem(
+                    value: RemoteSortField.type,
+                    child: Text('Tipo'),
                   ),
                 ],
-              );
-
-              final densityToggle = ToggleButtons(
-                isSelected: [
-                  vm.gridDensity == RemoteGridDensity.compact,
-                  vm.gridDensity == RemoteGridDensity.medium,
-                  vm.gridDensity == RemoteGridDensity.large,
-                ],
-                onPressed: (index) {
-                  vm.setGridDensity(switch (index) {
-                    0 => RemoteGridDensity.compact,
-                    1 => RemoteGridDensity.medium,
-                    _ => RemoteGridDensity.large,
-                  });
+                onChanged: (value) {
+                  if (value != null) vm.setSortField(value);
                 },
-                borderRadius: BorderRadius.circular(12),
-                constraints: const BoxConstraints(minHeight: 44, minWidth: 52),
-                children: const [
-                  Tooltip(message: 'Tarjetas compactas', child: Text('S')),
-                  Tooltip(message: 'Tarjetas medias', child: Text('M')),
-                  Tooltip(message: 'Tarjetas grandes', child: Text('L')),
-                ],
-              );
-
-              if (compact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    searchField,
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [viewToggle, densityToggle],
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: searchField),
-                  const SizedBox(width: 12),
-                  viewToggle,
-                  const SizedBox(width: 12),
-                  densityToggle,
-                ],
-              );
-            },
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -516,28 +447,9 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-int _gridCrossAxisCount(double width, RemoteGridDensity density) {
-  final targetWidth = switch (density) {
-    RemoteGridDensity.compact => 180.0,
-    RemoteGridDensity.medium => 220.0,
-    RemoteGridDensity.large => 280.0,
-  };
-  final count = (width / targetWidth).floor();
-  return count.clamp(2, 6);
-}
-
-double _gridChildAspectRatio(RemoteGridDensity density) {
-  return switch (density) {
-    RemoteGridDensity.compact => 0.95,
-    RemoteGridDensity.medium => 0.88,
-    RemoteGridDensity.large => 0.8,
-  };
-}
-
 class _FileGridTile extends StatelessWidget {
   final RemoteFile file;
   final String remotePath;
-  final RemoteGridDensity density;
   final VoidCallback onTap;
   final VoidCallback? onDownload;
 
@@ -545,7 +457,6 @@ class _FileGridTile extends StatelessWidget {
     super.key,
     required this.file,
     required this.remotePath,
-    required this.density,
     required this.onTap,
     required this.onDownload,
   });
@@ -553,55 +464,68 @@ class _FileGridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppTheme.surfaceVariant.withValues(alpha: 0.45),
+      color: AppTheme.surfaceVariant.withValues(alpha: 0.32),
       borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+      child: Padding(
+          padding: const EdgeInsets.all(6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: _GridPreview(file: file, remotePath: remotePath),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
+              Expanded(child: _GridPreview(file: file, remotePath: remotePath)),
+              const SizedBox(height: 6),
               Text(
                 file.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                file.isDirectory ? 'Carpeta' : '${file.size} bytes',
-                textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.onSurfaceMuted,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
               ),
-              if (onDownload != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.download),
-                    onPressed: onDownload,
-                    tooltip: 'Descargar',
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      file.isDirectory
+                          ? 'Carpeta'
+                          : FileUtils.fileCategory(file.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.onSurfaceMuted,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  if (!file.isDirectory) ...[
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          FileUtils.extensionOf(file.name).isEmpty
+                              ? 'FILE'
+                              : FileUtils.extensionOf(file.name).toUpperCase(),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: FileUtils.fileColor(
+                              file.name,
+                              isDirectory: false,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
@@ -647,61 +571,466 @@ class _GridPreviewState extends State<_GridPreview> {
   Widget build(BuildContext context) {
     final vm = context.watch<BrowserViewModel>();
     final thumbPath = vm.thumbnails[widget.file.path];
+    final thumbFile = thumbPath == null ? null : File(thumbPath);
+    final hasThumb = thumbFile != null && thumbFile.existsSync();
+    final icon = FileUtils.fileIcon(
+      widget.file.name,
+      isDirectory: widget.file.isDirectory,
+    );
+    final color = FileUtils.fileColor(
+      widget.file.name,
+      isDirectory: widget.file.isDirectory,
+    );
 
     if (widget.file.isDirectory) {
-      return Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.primary.withValues(alpha: 0.15),
-              AppTheme.surfaceVariant.withValues(alpha: 0.8),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(14),
+      return _FileFrame(
+        color: color,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 58, color: color),
+            const SizedBox(height: 8),
+            const Text(
+              'Carpeta',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.onSurfaceMuted,
+              ),
+            ),
+          ],
         ),
-        child: const Icon(Icons.folder, size: 52),
       );
     }
 
-    if (thumbPath == null) {
+    if (!hasThumb) {
       if (FileUtils.isImage(widget.file.name) ||
           FileUtils.isVideo(widget.file.name)) {
         _scheduleThumbnailRequest();
       }
-      return Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceVariant.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(
-          FileUtils.isVideo(widget.file.name)
-              ? Icons.videocam_outlined
-              : FileUtils.isImage(widget.file.name)
-              ? Icons.image_outlined
-              : Icons.insert_drive_file,
-          size: 44,
-        ),
+      return _FileFrame(
+        color: color,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 54, color: color),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                FileUtils.extensionOf(widget.file.name).toUpperCase().isEmpty
+                    ? 'FILE'
+                    : FileUtils.extensionOf(widget.file.name).toUpperCase(),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            ],
+          ),
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Image.file(
-        File(thumbPath),
-        fit: BoxFit.cover,
-        cacheWidth: 256,
-        cacheHeight: 256,
-        filterQuality: FilterQuality.medium,
-        gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(Icons.broken_image_outlined, size: 44),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Image.file(
+                  thumbFile!,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  cacheWidth: 256,
+                  cacheHeight: 256,
+                  filterQuality: FilterQuality.high,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    return _FileFrame(
+                      color: color,
+                      child: Icon(icon, size: 54, color: color),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Container(
+                margin: const EdgeInsets.all(8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  FileUtils.extensionOf(widget.file.name).isEmpty
+                      ? 'FILE'
+                      : FileUtils.extensionOf(widget.file.name).toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _FileFrame extends StatelessWidget {
+  final Widget child;
+  final Color color;
+
+  const _FileFrame({required this.child, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.18),
+            AppTheme.surfaceVariant.withValues(alpha: 0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Center(child: child),
+    );
+  }
+}
+
+class _FilePreviewScreen extends StatelessWidget {
+  final RemoteFile file;
+  final String? thumbnailPath;
+  final Future<void> Function() onDownload;
+
+  const _FilePreviewScreen({
+    required this.file,
+    required this.thumbnailPath,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = FileUtils.fileIcon(file.name, isDirectory: file.isDirectory);
+    final color = FileUtils.fileColor(file.name, isDirectory: file.isDirectory);
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      extendBodyBehindAppBar: !file.isDirectory &&
+          thumbnailPath != null &&
+          File(thumbnailPath!).existsSync(),
+      appBar: AppBar(
+        title: Text(file.name),
+        backgroundColor: !file.isDirectory &&
+                thumbnailPath != null &&
+                File(thumbnailPath!).existsSync()
+            ? Colors.black.withValues(alpha: 0.35)
+            : null,
+        foregroundColor: !file.isDirectory &&
+                thumbnailPath != null &&
+                File(thumbnailPath!).existsSync()
+            ? Colors.white
+            : null,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Ver detalles',
+            onPressed: () => _showDetailsSheet(context),
+            icon: const Icon(Icons.info_outline),
+          ),
+          if (!file.isDirectory)
+            IconButton(
+              tooltip: 'Descargar',
+              onPressed: () async {
+                await onDownload();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Descarga iniciada')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.download),
+          ),
+        ],
+      ),
+      body: file.isDirectory
+          ? SafeArea(
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 1,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    color.withValues(alpha: 0.22),
+                                    AppTheme.surfaceVariant,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                border: Border.all(
+                                  color: color.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: Center(
+                                  child: Icon(icon, size: 120, color: color),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            file.name,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            FileUtils.fileCategory(
+                              file.name,
+                              isDirectory: file.isDirectory,
+                            ),
+                            style: const TextStyle(
+                              color: AppTheme.onSurfaceMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                ],
+              ),
+            )
+          : (thumbnailPath != null && File(thumbnailPath!).existsSync())
+          ? SafeArea(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(
+                    File(thumbnailPath!),
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ],
+              ),
+            )
+          : SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        gradient: LinearGradient(
+                          colors: [
+                            color.withValues(alpha: 0.22),
+                            AppTheme.surfaceVariant,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(
+                          color: color.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Center(
+                          child: Icon(icon, size: 120, color: color),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Future<void> _showDetailsSheet(BuildContext context) async {
+    final ext = FileUtils.extensionOf(file.name).isEmpty
+        ? 'N/A'
+        : FileUtils.extensionOf(file.name).toUpperCase();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppTheme.background,
+      isScrollControlled: true,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.82,
+          widthFactor: 1,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceVariant.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Detalles',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            file.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.onSurfaceMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _DetailRow(
+                      label: 'Nombre',
+                      value: file.name,
+                      icon: Icons.badge_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Extensión',
+                      value: ext,
+                      icon: Icons.extension_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Tipo',
+                      value: FileUtils.fileCategory(
+                        file.name,
+                        isDirectory: file.isDirectory,
+                      ),
+                      icon: Icons.category_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Tamaño',
+                      value: file.isDirectory
+                          ? 'Carpeta'
+                          : FileUtils.formatBytes(file.size),
+                      icon: Icons.sd_storage_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Fecha',
+                      value: file.modifiedAt == null
+                          ? 'Sin fecha'
+                          : '${file.modifiedAt!.day.toString().padLeft(2, '0')}/${file.modifiedAt!.month.toString().padLeft(2, '0')}/${file.modifiedAt!.year} ${file.modifiedAt!.hour.toString().padLeft(2, '0')}:${file.modifiedAt!.minute.toString().padLeft(2, '0')}',
+                      icon: Icons.schedule_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Ruta',
+                      value: file.path,
+                      icon: Icons.route_outlined,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariant.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: AppTheme.primary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppTheme.onSurfaceMuted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 15, height: 1.25),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -727,121 +1056,4 @@ class _PathBar extends StatelessWidget {
   }
 }
 
-class _FileListTile extends StatelessWidget {
-  final RemoteFile file;
-  final String remotePath;
-  final VoidCallback onTap;
-  final VoidCallback? onDownload;
 
-  const _FileListTile({
-    super.key,
-    required this.file,
-    required this.remotePath,
-    required this.onTap,
-    required this.onDownload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: file.isDirectory
-          ? const Icon(Icons.folder)
-          : _FileLeading(file: file, remotePath: remotePath),
-      title: Text(file.name),
-      onTap: onTap,
-      trailing: onDownload == null
-          ? null
-          : IconButton(icon: const Icon(Icons.download), onPressed: onDownload),
-    );
-  }
-}
-
-class _FileLeading extends StatefulWidget {
-  final RemoteFile file;
-  final String remotePath;
-
-  const _FileLeading({required this.file, required this.remotePath});
-
-  @override
-  State<_FileLeading> createState() => _FileLeadingState();
-}
-
-class _FileLeadingState extends State<_FileLeading> {
-  String? _requestedPath;
-
-  @override
-  void didUpdateWidget(covariant _FileLeading oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.file.path != widget.file.path) {
-      _requestedPath = null;
-    }
-  }
-
-  void _scheduleThumbnailRequest() {
-    if (_requestedPath == widget.file.path) return;
-    _requestedPath = widget.file.path;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<BrowserViewModel>().requestThumbnail(
-        widget.file,
-        widget.remotePath,
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<BrowserViewModel>();
-    final thumbPath = vm.thumbnails[widget.file.path];
-
-    if (thumbPath == null) {
-      if (FileUtils.isImage(widget.file.name) ||
-          FileUtils.isVideo(widget.file.name)) {
-        _scheduleThumbnailRequest();
-      }
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.surfaceVariant.withValues(alpha: 0.95),
-              AppTheme.surfaceVariant.withValues(alpha: 0.65),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          FileUtils.isVideo(widget.file.name)
-              ? Icons.videocam_outlined
-              : FileUtils.isImage(widget.file.name)
-              ? Icons.image_outlined
-              : Icons.insert_drive_file,
-          size: 22,
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.file(
-        File(thumbPath),
-        width: 48,
-        height: 48,
-        fit: BoxFit.cover,
-        cacheWidth: 96,
-        cacheHeight: 96,
-        filterQuality: FilterQuality.medium,
-        gaplessPlayback: true,
-        errorBuilder: (context, error, stackTrace) => Container(
-          width: 48,
-          height: 48,
-          color: AppTheme.surfaceVariant,
-          child: const Icon(Icons.broken_image_outlined, size: 22),
-        ),
-      ),
-    );
-  }
-}

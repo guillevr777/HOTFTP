@@ -44,7 +44,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDb,
       onUpgrade: _upgradeDb,
     );
@@ -55,7 +55,8 @@ class DatabaseHelper {
       CREATE TABLE ftp_profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ownerId TEXT NOT NULL,
-        transportType TEXT NOT NULL DEFAULT 'local',
+        transportType TEXT NOT NULL DEFAULT 'direct',
+        protocol TEXT NOT NULL DEFAULT 'ftp',
         name TEXT NOT NULL,
         host TEXT NOT NULL,
         port INTEGER NOT NULL DEFAULT 21,
@@ -212,7 +213,7 @@ class DatabaseHelper {
     if (oldVersion < 7) {
       await _ensureColumn(db, 'ftp_profiles', 'transportType', 'TEXT');
       await db.execute(
-        "UPDATE ftp_profiles SET transportType = COALESCE(transportType, 'local')",
+        "UPDATE ftp_profiles SET transportType = COALESCE(transportType, 'direct')",
       );
     }
 
@@ -235,6 +236,29 @@ class DatabaseHelper {
           UNIQUE(ownerId, profileId)
         )
       ''');
+    }
+
+    if (oldVersion < 9) {
+      await _ensureColumn(db, 'ftp_profiles', 'protocol', 'TEXT');
+      await db.execute(
+        '''
+        UPDATE ftp_profiles
+        SET protocol = CASE
+          WHEN protocol IS NOT NULL AND protocol != '' THEN protocol
+          WHEN useFTPS = 1 THEN 'ftps'
+          ELSE 'ftp'
+        END
+        ''',
+      );
+      await db.execute(
+        '''
+        UPDATE ftp_profiles
+        SET transportType = CASE
+          WHEN transportType IN ('api', 'remote') THEN 'api'
+          ELSE 'direct'
+        END
+        ''',
+      );
     }
   }
 
@@ -259,7 +283,7 @@ class DatabaseHelper {
           .map(
             (profile) => FtpProfile.fromMap(
               profile,
-              defaultTransportType: FtpTransportType.local,
+              defaultTransportType: FtpTransportType.direct,
             ),
           )
           .toList();
@@ -275,7 +299,7 @@ class DatabaseHelper {
         .map(
           (map) => FtpProfile.fromMap(
             map,
-            defaultTransportType: FtpTransportType.local,
+            defaultTransportType: FtpTransportType.direct,
           ),
         )
         .toList();

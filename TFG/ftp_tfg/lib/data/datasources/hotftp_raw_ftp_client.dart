@@ -220,7 +220,8 @@ class HotftpRawFtpClient {
     final port = config['port'] ?? 21;
     final user = config['username'] ?? '';
     final password = config['password'] ?? '';
-    final useFTPS = config['useFTPS'] == true;
+    final protocol = '${config['protocol'] ?? ''}'.toLowerCase();
+    final useFTPS = config['useFTPS'] == true || protocol == 'ftps';
     final passive = config['passiveMode'] ?? true;
 
     if (!kIsWeb &&

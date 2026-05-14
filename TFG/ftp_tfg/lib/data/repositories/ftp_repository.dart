@@ -10,6 +10,7 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
+import '../../core/services/connection_route_resolver.dart';
 import '../interfaces/ftp_datasource.dart';
 import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
@@ -20,6 +21,7 @@ import '../../utils/thumbnail_utils.dart';
 class FtpRepositoryImpl implements FtpRepository {
   final FtpDatasource datasource;
   final DatabaseHelper _db = DatabaseHelper.instance;
+  static const _routeResolver = ConnectionRouteResolver();
 
   FtpRepositoryImpl(this.datasource);
 
@@ -29,6 +31,7 @@ class FtpRepositoryImpl implements FtpRepository {
       'port': profile.port,
       'username': profile.username,
       'password': profile.password,
+      'protocol': profile.protocol.name,
       'useFTPS': profile.useFTPS,
       'passiveMode': profile.passiveMode,
     };
@@ -256,7 +259,7 @@ class FtpRepositoryImpl implements FtpRepository {
   @override
   Future<int> saveProfile(FtpProfile profile, String ownerId) {
     final localProfile = profile.copyWith(
-      transportType: FtpTransportType.local,
+      transportType: _routeResolver.resolveTransportType(profile.host),
     );
     if (profile.id == null) {
       return _db.insertProfile(localProfile, ownerId);
@@ -271,7 +274,10 @@ class FtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
-    return datasource.testConnection(_getConfig(profile));
+    return datasource
+        .testConnection(_getConfig(profile))
+        .timeout(const Duration(seconds: 3), onTimeout: () => false)
+        .catchError((_) => false);
   }
 
   @override

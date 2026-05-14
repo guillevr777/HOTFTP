@@ -51,7 +51,12 @@ class ProfileViewModel extends ChangeNotifier {
     isTesting = true;
     testResult = null;
     notifyListeners();
-    final ok = await _testConnectionUseCase.execute(profile);
+    bool ok = false;
+    try {
+      ok = await _testConnectionUseCase.execute(profile);
+    } catch (_) {
+      ok = false;
+    }
     testResult = ok ? 'Conexion exitosa' : 'No se pudo conectar';
     isTesting = false;
     notifyListeners();

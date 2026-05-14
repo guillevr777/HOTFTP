@@ -1,9 +1,6 @@
-﻿import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:http/http.dart' as http;
 
 import '../../domain/entities/app_user.dart';
 import '../../firebase_options.dart';
@@ -58,7 +55,7 @@ class FirebaseAuthDatasource {
     required String password,
   }) async {
     final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
+      email: _normalizeEmail(email),
       password: password,
     );
     final user = _mapUser(credential.user);
@@ -77,7 +74,7 @@ class FirebaseAuthDatasource {
     required String displayName,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
+      email: _normalizeEmail(email),
       password: password,
     );
     final user = credential.user;
@@ -138,7 +135,7 @@ class FirebaseAuthDatasource {
     if (hasPasswordProvider) {
       throw FirebaseAuthException(
         code: 'provider-already-linked',
-        message: 'La cuenta ya tiene acceso con correo y contraseÃ±a',
+        message: 'La cuenta ya tiene acceso con correo y contrasena',
       );
     }
 
@@ -151,7 +148,7 @@ class FirebaseAuthDatasource {
     if (linkedUser == null) {
       throw FirebaseAuthException(
         code: 'null-user',
-        message: 'No se pudo vincular el acceso con correo y contraseÃ±a',
+        message: 'No se pudo vincular el acceso con correo y contrasena',
       );
     }
     return linkedUser;
@@ -169,7 +166,7 @@ class FirebaseAuthDatasource {
     if (trimmed.isEmpty) {
       throw FirebaseAuthException(
         code: 'invalid-display-name',
-        message: 'El nombre no puede estar vacÃ­o',
+        message: 'El nombre no puede estar vacio',
       );
     }
     await user.updateDisplayName(trimmed);
@@ -178,65 +175,16 @@ class FirebaseAuthDatasource {
   }
 
   Future<void> sendPasswordResetEmail(String email) {
-    final trimmed = email.trim();
-    return _sendPasswordResetEmail(trimmed);
+    return _sendPasswordResetEmail(_normalizeEmail(email));
   }
 
   Future<void> _sendPasswordResetEmail(String email) async {
-    final methods = await _fetchSignInMethodsForEmail(email);
-    if (methods.isEmpty) {
-      throw FirebaseAuthException(
-        code: 'user-not-found',
-        message: 'No se ha encontrado ninguna cuenta asociada a ese correo',
-      );
-    }
-    if (!methods.contains('password')) {
-      throw FirebaseAuthException(
-        code: 'no-password-provider-linked',
-        message:
-            'Esta cuenta se inicia con Google y todavÃ­a no tiene una contraseÃ±a vinculada.',
-      );
-    }
     await _auth.sendPasswordResetEmail(email: email);
-  }
-
-  Future<List<String>> _fetchSignInMethodsForEmail(String email) async {
-    final apiKey = DefaultFirebaseOptions.currentPlatform.apiKey;
-    final response = await http.post(
-      Uri.https(
-        'identitytoolkit.googleapis.com',
-        '/v1/accounts:createAuthUri',
-        {'key': apiKey},
-      ),
-      headers: const {'Content-Type': 'application/json; charset=utf-8'},
-      body: jsonEncode({
-        'identifier': email,
-        'continueUri': 'http://localhost',
-      }),
-    );
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw FirebaseAuthException(
-        code: 'network-request-failed',
-        message: 'No se pudo comprobar los mÃ©todos de inicio de sesiÃ³n',
-      );
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    final methods = <String>[];
-    for (final key in ['allProviders', 'signinMethods']) {
-      final raw = body[key];
-      if (raw is List) {
-        methods.addAll(raw.map((value) => value.toString()));
-      }
-    }
-    return methods.toSet().toList(growable: false);
   }
 
   Future<void> signOut() async {
     await Future.wait([_auth.signOut(), if (!kIsWeb) _googleSignIn.signOut()]);
   }
+
+  String _normalizeEmail(String email) => email.trim().toLowerCase();
 }
-
-
-

@@ -10,6 +10,7 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
+import '../../core/services/connection_route_resolver.dart';
 import '../../utils/file_utils.dart';
 import '../../utils/thumbnail_cache.dart';
 import '../mappers/remote_file_mapper.dart';
@@ -18,6 +19,7 @@ import '../../utils/thumbnail_utils.dart';
 
 class ApiFtpRepositoryImpl implements FtpRepository {
   final HotftpApiClient client;
+  static const _routeResolver = ConnectionRouteResolver();
 
   ApiFtpRepositoryImpl(this.client);
 
@@ -25,6 +27,7 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     final payload = <String, dynamic>{
       'ownerId': ownerId,
       'transportType': profile.transportType.name,
+      'protocol': profile.protocol.name,
       'name': profile.name,
       'host': profile.host,
       'port': profile.port,
@@ -285,7 +288,12 @@ class ApiFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<int> saveProfile(FtpProfile profile, String ownerId) async {
-    final payload = _profilePayload(profile, ownerId);
+    final payload = _profilePayload(
+      profile.copyWith(
+        transportType: _routeResolver.resolveTransportType(profile.host),
+      ),
+      ownerId,
+    );
     final saved = await client.saveProfile(payload);
     final savedProfile = FtpProfile.fromMap(saved);
     return savedProfile.id ?? profile.id ?? 0;
@@ -298,9 +306,12 @@ class ApiFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<bool> testConnection(FtpProfile profile) {
-    return client.testConnection(
-      _profilePayload(profile, _ownerIdFor(profile)),
-    );
+    return client
+        .testConnection(
+          _profilePayload(profile, _ownerIdFor(profile)),
+        )
+        .timeout(const Duration(seconds: 3), onTimeout: () => false)
+        .catchError((_) => false);
   }
 
   @override

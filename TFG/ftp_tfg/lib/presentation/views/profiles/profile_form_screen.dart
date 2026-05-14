@@ -20,10 +20,9 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   late final TextEditingController _port;
   late final TextEditingController _user;
   late final TextEditingController _pass;
-  bool _useFTPS = false;
   bool _passiveMode = true;
   bool _obscurePass = true;
-  FtpTransportType _transportType = FtpTransportType.remote;
+  FtpProtocolType _protocol = FtpProtocolType.ftp;
 
   bool get isEditing => widget.profile != null;
 
@@ -36,9 +35,8 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
     _port = TextEditingController(text: (p?.port ?? 21).toString());
     _user = TextEditingController(text: p?.username ?? '');
     _pass = TextEditingController(text: p?.password ?? '');
-    _useFTPS = p?.useFTPS ?? false;
     _passiveMode = p?.passiveMode ?? true;
-    _transportType = p?.transportType ?? FtpTransportType.remote;
+    _protocol = p?.protocol ?? FtpProtocolType.ftp;
   }
 
   @override
@@ -59,10 +57,38 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
         port: int.tryParse(_port.text) ?? 21,
         username: _user.text.trim(),
         password: _pass.text,
-        transportType: _transportType,
-        useFTPS: _useFTPS,
+        transportType: _resolveTransportType(_host.text.trim()),
+        protocol: _protocol,
         passiveMode: _passiveMode,
       );
+
+  FtpTransportType _resolveTransportType(String host) {
+    final normalized = host.trim().toLowerCase();
+    if (normalized.isEmpty) return FtpTransportType.api;
+    if (normalized == 'localhost') return FtpTransportType.direct;
+
+    final ipv4 = RegExp(
+      r'^(?:\d{1,3}\.){3}\d{1,3}$',
+    ).hasMatch(normalized);
+    if (!ipv4) return FtpTransportType.api;
+
+    final parts = normalized.split('.').map(int.parse).toList();
+    final a = parts[0];
+    final b = parts[1];
+    if (a == 10 || a == 127) return FtpTransportType.direct;
+    if (a == 169 && b == 254) return FtpTransportType.direct;
+    if (a == 172 && b >= 16 && b <= 31) return FtpTransportType.direct;
+    if (a == 192 && b == 168) return FtpTransportType.direct;
+    return FtpTransportType.api;
+  }
+
+  String _protocolLabel(FtpProtocolType protocol) {
+    return switch (protocol) {
+      FtpProtocolType.ftp => 'FTP',
+      FtpProtocolType.sftp => 'SFTP',
+      FtpProtocolType.ftps => 'FTPS',
+    };
+  }
 
   Future<void> _save(ProfileViewModel vm) async {
     if (!_formKey.currentState!.validate()) return;
@@ -111,6 +137,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                 label: 'Host / IP',
                 icon: Icons.dns_outlined,
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
               _Field(
@@ -154,40 +181,49 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               Card(
                 child: Column(
                   children: [
-                    DropdownButtonFormField<FtpTransportType>(
-                      initialValue: _transportType,
+                    DropdownButtonFormField<FtpProtocolType>(
+                      initialValue: _protocol,
                       decoration: const InputDecoration(
-                        labelText: 'Tipo de conexion',
-                        prefixIcon: Icon(Icons.swap_horiz),
+                        labelText: 'Protocolo FTP',
+                        prefixIcon: Icon(Icons.cloud_sync_outlined),
                       ),
                       items: const [
                         DropdownMenuItem(
-                          value: FtpTransportType.local,
-                          child: Text('FTP local directo'),
+                          value: FtpProtocolType.ftp,
+                          child: Text('FTP'),
                         ),
                         DropdownMenuItem(
-                          value: FtpTransportType.remote,
-                          child: Text('FTP remoto via API'),
+                          value: FtpProtocolType.sftp,
+                          child: Text('SFTP'),
+                        ),
+                        DropdownMenuItem(
+                          value: FtpProtocolType.ftps,
+                          child: Text('FTPS'),
                         ),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
-                        setState(() => _transportType = value);
+                        setState(() {
+                          _protocol = value;
+                          final currentPort = int.tryParse(_port.text);
+                          if (value == FtpProtocolType.sftp &&
+                              (currentPort == null || currentPort == 21)) {
+                            _port.text = '22';
+                          } else if (value != FtpProtocolType.sftp &&
+                              (currentPort == null || currentPort == 22)) {
+                            _port.text = '21';
+                          }
+                        });
                       },
                     ),
                     const Divider(height: 1),
-                    SwitchListTile(
-                      title: const Text('Usar FTPS (SSL/TLS)'),
-                      subtitle: const Text(
-                        'Cifrado de la conexion',
-                        style: TextStyle(
-                          color: AppTheme.onSurfaceMuted,
-                          fontSize: 12,
-                        ),
+                    ListTile(
+                      leading: const Icon(Icons.security_outlined),
+                      title: const Text('Modo cifrado'),
+                      subtitle: Text(_protocolLabel(_protocol)),
+                      trailing: Chip(
+                        label: Text(_protocolLabel(_protocol)),
                       ),
-                      value: _useFTPS,
-                      activeThumbColor: AppTheme.primary,
-                      onChanged: (v) => setState(() => _useFTPS = v),
                     ),
                     const Divider(height: 1),
                     SwitchListTile(
@@ -259,6 +295,7 @@ class _Field extends StatelessWidget {
   final IconData icon;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
 
   const _Field({
     required this.controller,
@@ -266,6 +303,7 @@ class _Field extends StatelessWidget {
     required this.icon,
     this.keyboardType,
     this.validator,
+    this.onChanged,
   });
 
   @override
@@ -277,5 +315,6 @@ class _Field extends StatelessWidget {
           prefixIcon: Icon(icon),
         ),
         validator: validator,
+        onChanged: onChanged,
       );
 }

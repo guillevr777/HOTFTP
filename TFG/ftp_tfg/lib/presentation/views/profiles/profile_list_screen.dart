@@ -250,7 +250,13 @@ class _ProfileCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      _TransportBadge(transportType: profile.transportType),
+                      Row(
+                        children: [
+                          _TransportBadge(transportType: profile.transportType),
+                          const SizedBox(width: 8),
+                          _ProtocolBadge(protocol: profile.protocol),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -291,19 +297,54 @@ class _TransportBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLocal = transportType == FtpTransportType.local;
+    final isDirect = transportType == FtpTransportType.direct;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (isLocal ? AppTheme.success : AppTheme.primary).withValues(
+        color: (isDirect ? AppTheme.success : AppTheme.primary).withValues(
           alpha: 0.12,
         ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        isLocal ? 'Local directo' : 'Remoto via API',
+        isDirect ? 'Directo' : 'API',
         style: TextStyle(
-          color: isLocal ? AppTheme.success : AppTheme.primary,
+          color: isDirect ? AppTheme.success : AppTheme.primary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProtocolBadge extends StatelessWidget {
+  final FtpProtocolType protocol;
+
+  const _ProtocolBadge({required this.protocol});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (protocol) {
+      FtpProtocolType.ftp => AppTheme.primary,
+      FtpProtocolType.sftp => AppTheme.warning,
+      FtpProtocolType.ftps => AppTheme.success,
+    };
+    final label = switch (protocol) {
+      FtpProtocolType.ftp => 'FTP',
+      FtpProtocolType.sftp => 'SFTP',
+      FtpProtocolType.ftps => 'FTPS',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
