@@ -258,7 +258,8 @@ class BrowserViewModel extends ChangeNotifier {
   }
 
   Future<void> _trackFileVersions() async {
-    if (profile.id == null || profile.transportType == FtpTransportType.direct) {
+    if (profile.id == null ||
+        profile.transportType == FtpTransportType.direct) {
       return;
     }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
@@ -378,6 +379,12 @@ class BrowserViewModel extends ChangeNotifier {
     _queuedThumbnailPaths.add(file.path);
     _thumbnailQueue.add(_ThumbnailRequest(file: file, remotePath: remotePath));
     _pumpThumbnailQueue();
+  }
+
+  void invalidateThumbnail(String filePath) {
+    if (thumbnails.remove(filePath) != null) {
+      notifyListeners();
+    }
   }
 
   Future<void> loadThumbnail(RemoteFile file, String remotePath) async {

@@ -1,5 +1,5 @@
-﻿import 'dart:convert';
-import 'dart:ui' as ui;
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -230,14 +230,16 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
                       controller: _scrollController,
                       padding: const EdgeInsets.all(12),
                       cacheExtent: 0,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 0.9,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 0.9,
+                          ),
                       itemCount:
-                          displayedFiles.length + (vm.hasMoreRemoteFiles ? 1 : 0),
+                          displayedFiles.length +
+                          (vm.hasMoreRemoteFiles ? 1 : 0),
                       itemBuilder: (context, i) {
                         if (i >= displayedFiles.length) {
                           return const Center(
@@ -394,14 +396,12 @@ class _FilterBar extends StatelessWidget {
                       ? Icons.arrow_upward
                       : Icons.arrow_downward,
                 ),
-                label: Text(
-                  switch (vm.sortField) {
-                    RemoteSortField.name => 'Nombre',
-                    RemoteSortField.date => 'Fecha',
-                    RemoteSortField.size => 'TamaÃ±o',
-                    RemoteSortField.type => 'Tipo',
-                  },
-                ),
+                label: Text(switch (vm.sortField) {
+                  RemoteSortField.name => 'Nombre',
+                  RemoteSortField.date => 'Fecha',
+                  RemoteSortField.size => 'TamaÃ±o',
+                  RemoteSortField.type => 'Tipo',
+                }),
               ),
               const SizedBox(width: 12),
               DropdownButton<RemoteSortField>(
@@ -481,12 +481,14 @@ class _FileGridTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-      child: Padding(
+        child: Padding(
           padding: const EdgeInsets.all(6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: _GridPreview(file: file, remotePath: remotePath)),
+              Expanded(
+                child: _GridPreview(file: file, remotePath: remotePath),
+              ),
               const SizedBox(height: 6),
               Text(
                 file.name,
@@ -557,12 +559,14 @@ class _GridPreview extends StatefulWidget {
 
 class _GridPreviewState extends State<_GridPreview> {
   String? _requestedPath;
+  bool _retryScheduledForCurrentThumb = false;
 
   @override
   void didUpdateWidget(covariant _GridPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.path != widget.file.path) {
       _requestedPath = null;
+      _retryScheduledForCurrentThumb = false;
     }
   }
 
@@ -634,7 +638,10 @@ class _GridPreviewState extends State<_GridPreview> {
               Icon(icon, size: 52, color: color),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
@@ -656,6 +663,8 @@ class _GridPreviewState extends State<_GridPreview> {
       );
     }
 
+    final existingThumbFile = thumbFile;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.04),
@@ -671,7 +680,7 @@ class _GridPreviewState extends State<_GridPreview> {
               child: Padding(
                 padding: const EdgeInsets.all(6),
                 child: Image.file(
-                  thumbFile!,
+                  thumbFile,
                   fit: BoxFit.contain,
                   alignment: Alignment.center,
                   cacheWidth: 256,
@@ -679,6 +688,22 @@ class _GridPreviewState extends State<_GridPreview> {
                   filterQuality: FilterQuality.high,
                   gaplessPlayback: true,
                   errorBuilder: (context, error, stackTrace) {
+                    if (!_retryScheduledForCurrentThumb) {
+                      _retryScheduledForCurrentThumb = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        unawaited(() async {
+                          if (!mounted) return;
+                          final vm = context.read<BrowserViewModel>();
+                          vm.invalidateThumbnail(widget.file.path);
+                          if (existingThumbFile.existsSync()) {
+                            await existingThumbFile.delete();
+                          }
+                          _requestedPath = null;
+                          _retryScheduledForCurrentThumb = false;
+                          vm.requestThumbnail(widget.file, widget.remotePath);
+                        }());
+                      });
+                    }
                     return _FileFrame(
                       color: color,
                       child: Icon(icon, size: 54, color: color),
@@ -691,8 +716,7 @@ class _GridPreviewState extends State<_GridPreview> {
               alignment: Alignment.bottomRight,
               child: Container(
                 margin: const EdgeInsets.all(8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(999),
@@ -771,9 +795,16 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final icon = FileUtils.fileIcon(widget.file.name, isDirectory: widget.file.isDirectory);
-    final color = FileUtils.fileColor(widget.file.name, isDirectory: widget.file.isDirectory);
-    final isMedia = _previewKind != _PreviewKind.other && !widget.file.isDirectory;
+    final icon = FileUtils.fileIcon(
+      widget.file.name,
+      isDirectory: widget.file.isDirectory,
+    );
+    final color = FileUtils.fileColor(
+      widget.file.name,
+      isDirectory: widget.file.isDirectory,
+    );
+    final isMedia =
+        _previewKind != _PreviewKind.other && !widget.file.isDirectory;
 
     return Scaffold(
       backgroundColor: isMedia ? Colors.black : AppTheme.background,
@@ -853,7 +884,9 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
                               widget.file.name,
                               isDirectory: widget.file.isDirectory,
                             ),
-                            style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                            style: const TextStyle(
+                              color: AppTheme.onSurfaceMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -889,11 +922,15 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
                 }
 
                 return switch (_previewKind) {
-                  _PreviewKind.image => _ImagePreviewViewport(filePath: previewPath),
-                  _PreviewKind.video => _VideoPreviewViewport(filePath: previewPath),
+                  _PreviewKind.image => _ImagePreviewViewport(
+                    filePath: previewPath,
+                  ),
+                  _PreviewKind.video => _VideoPreviewViewport(
+                    filePath: previewPath,
+                  ),
                   _PreviewKind.pdf => SafeArea(
-                      child: SfPdfViewer.file(File(previewPath)),
-                    ),
+                    child: SfPdfViewer.file(File(previewPath)),
+                  ),
                   _PreviewKind.other => _buildOtherFileView(icon, color),
                 };
               },
@@ -919,15 +956,11 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.35),
-                ),
+                border: Border.all(color: color.withValues(alpha: 0.35)),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                child: Center(
-                  child: Icon(icon, size: 120, color: color),
-                ),
+                child: Center(child: Icon(icon, size: 120, color: color)),
               ),
             ),
           ),
@@ -951,17 +984,17 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
     final previewDir = Directory(p.join(tempDir.path, 'hotftp_preview_cache'));
     await previewDir.create(recursive: true);
 
-    final hashInput = '${widget.file.path}|${widget.file.size}|${widget.file.modifiedAt?.toIso8601String() ?? ''}';
+    final hashInput =
+        '${widget.file.path}|${widget.file.size}|${widget.file.modifiedAt?.toIso8601String() ?? ''}';
     final key = sha1.convert(utf8.encode(hashInput)).toString();
-    final ext = FileUtils.extensionOf(widget.file.name).isEmpty
-        ? 'bin'
-        : FileUtils.extensionOf(widget.file.name);
-    final previewPath = p.join(previewDir.path, '$key.$ext');
-    final previewFile = File(previewPath);
-    if (await previewFile.exists()) return previewPath;
+    final previewFilePath = p.join(previewDir.path, key, widget.file.name);
+    final previewFile = File(previewFilePath);
+    if (await previewFile.exists()) return previewFilePath;
 
-    await widget.downloadFileUseCase.execute(widget.file, previewPath, widget.profile);
-    return previewPath;
+    await widget.downloadFileUseCase
+        .execute(widget.file, p.dirname(previewFilePath), widget.profile)
+        .timeout(const Duration(seconds: 30));
+    return previewFilePath;
   }
 
   Future<void> _showDetailsSheet(BuildContext context) async {
@@ -1066,84 +1099,37 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
 
 enum _PreviewKind { image, video, pdf, other }
 
-class _ImagePreviewViewport extends StatefulWidget {
+class _ImagePreviewViewport extends StatelessWidget {
   final String filePath;
 
   const _ImagePreviewViewport({required this.filePath});
 
   @override
-  State<_ImagePreviewViewport> createState() => _ImagePreviewViewportState();
-}
-
-class _ImagePreviewViewportState extends State<_ImagePreviewViewport> {
-  late final Future<ui.Size> _imageSizeFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _imageSizeFuture = _loadImageSize(widget.filePath);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<ui.Size>(
-      future: _imageSizeFuture,
-      builder: (context, snapshot) {
-        final imageSize = snapshot.data ?? const ui.Size(1, 1);
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final screenAspect = constraints.maxWidth / constraints.maxHeight;
-            final imageAspect = imageSize.width / imageSize.height;
-            final fit = imageAspect > screenAspect
-                ? BoxFit.fitWidth
-                : BoxFit.fitHeight;
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(
-                  File(widget.filePath),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.low,
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 5,
+          child: Image.file(
+            File(filePath),
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (context, error, stackTrace) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No se pudo mostrar la imagen',
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
                 ),
-                Container(color: Colors.black.withValues(alpha: 0.25)),
-                Center(
-                  child: InteractiveViewer(
-                    minScale: 1,
-                    maxScale: 4,
-                    child: FittedBox(
-                      fit: fit,
-                      child: SizedBox(
-                        width: imageSize.width,
-                        height: imageSize.height,
-                        child: Image.file(
-                          File(widget.filePath),
-                          fit: BoxFit.fill,
-                          filterQuality: FilterQuality.high,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+              );
+            },
+          ),
+        ),
+      ),
     );
-  }
-
-  Future<ui.Size> _loadImageSize(String imagePath) async {
-    final bytes = await File(imagePath).readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frameInfo = await codec.getNextFrame();
-    final size = ui.Size(
-      frameInfo.image.width.toDouble(),
-      frameInfo.image.height.toDouble(),
-    );
-    codec.dispose();
-    return size;
   }
 }
 
@@ -1328,10 +1314,7 @@ class _DetailRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 15, height: 1.25),
-                ),
+                Text(value, style: const TextStyle(fontSize: 15, height: 1.25)),
               ],
             ),
           ),
@@ -1360,9 +1343,3 @@ class _PathBar extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-

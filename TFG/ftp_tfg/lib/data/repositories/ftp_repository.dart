@@ -168,8 +168,13 @@ class FtpRepositoryImpl implements FtpRepository {
     final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
     final thumbFile = File(thumbnailPath);
 
-    if (thumbFile.existsSync()) {
+    if (thumbFile.existsSync() &&
+        await ThumbnailUtils.isReadableImageFile(thumbnailPath)) {
       return thumbnailPath;
+    }
+
+    if (thumbFile.existsSync()) {
+      await thumbFile.delete();
     }
 
     final sourcePath = '${cacheDir.path}/$cacheKey.src';

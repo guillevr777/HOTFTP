@@ -194,8 +194,13 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
     final thumbFile = File(thumbnailPath);
 
-    if (thumbFile.existsSync()) {
+    if (thumbFile.existsSync() &&
+        await ThumbnailUtils.isReadableImageFile(thumbnailPath)) {
       return thumbnailPath;
+    }
+
+    if (thumbFile.existsSync()) {
+      await thumbFile.delete();
     }
 
     final sourcePath = '${cacheDir.path}/$cacheKey.src';
@@ -307,9 +312,7 @@ class ApiFtpRepositoryImpl implements FtpRepository {
   @override
   Future<bool> testConnection(FtpProfile profile) {
     return client
-        .testConnection(
-          _profilePayload(profile, _ownerIdFor(profile)),
-        )
+        .testConnection(_profilePayload(profile, _ownerIdFor(profile)))
         .timeout(const Duration(seconds: 3), onTimeout: () => false)
         .catchError((_) => false);
   }
