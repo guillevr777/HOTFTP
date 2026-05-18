@@ -15,7 +15,6 @@ import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/file_utils.dart';
-import '../../../utils/thumbnail_cache.dart';
 import '../../../utils/thumbnail_utils.dart';
 import '../../viewmodels/browser_view_model.dart';
 import '../history/history_screen.dart';
@@ -788,7 +787,6 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
   late final _PreviewKind _previewKind;
   String? _previewPath;
   bool _previewLoading = true;
-  bool _imagePreviewWarming = false;
 
   @override
   void initState() {
@@ -1076,16 +1074,11 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
           .timeout(const Duration(seconds: 30));
 
       if (_previewKind == _PreviewKind.image) {
-        return ThumbnailUtils.buildThumbnailFromFile(
-          sourcePath: sourcePath,
-          thumbnailPath: previewFilePath,
-          maxDimension: 1600,
-        );
+        return sourcePath;
       }
-
       return sourcePath;
     } finally {
-      if (_previewKind == _PreviewKind.image) {
+      if (_previewKind != _PreviewKind.image) {
         final sourceFile = File(sourcePath);
         if (sourceFile.existsSync()) {
           await sourceFile.delete();
@@ -1107,16 +1100,13 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
 
     try {
       if (_previewKind == _PreviewKind.image) {
-        final thumbPath = await _thumbCachePath();
-        if (thumbPath != null &&
-            await ThumbnailUtils.isReadableImageFile(thumbPath)) {
-          setState(() {
-            _previewPath = thumbPath;
-            _previewLoading = false;
-          });
-          _warmImagePreview();
-          return;
-        }
+        final previewPath = await _loadPreviewFile();
+        if (!mounted) return;
+        setState(() {
+          _previewPath = previewPath;
+          _previewLoading = false;
+        });
+        return;
       }
 
       final previewPath = await _loadPreviewFile();
@@ -1131,34 +1121,6 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
         _previewLoading = false;
       });
     }
-  }
-
-  Future<String?> _thumbCachePath() async {
-    final cacheDir = await ThumbnailCache.resolveDirectory();
-    final cacheKey = ThumbnailCache.buildKey(
-      filePath: widget.file.path,
-      fileName: widget.file.name,
-      fileSize: widget.file.size,
-      modifiedAt: widget.file.modifiedAt,
-      profileId: widget.profile.id ?? 0,
-      isVideo: false,
-    );
-    return p.join(cacheDir.path, '$cacheKey.png');
-  }
-
-  void _warmImagePreview() {
-    if (_imagePreviewWarming || _previewKind != _PreviewKind.image) return;
-    _imagePreviewWarming = true;
-    unawaited(() async {
-      try {
-        final previewPath = await _loadPreviewFile();
-        if (!mounted || previewPath == null) return;
-        if (_previewPath == previewPath) return;
-        setState(() {
-          _previewPath = previewPath;
-        });
-      } catch (_) {}
-    }());
   }
 
   Future<void> _showDetailsSheet(BuildContext context) async {
