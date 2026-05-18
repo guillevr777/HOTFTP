@@ -8,7 +8,7 @@ import 'package:universal_io/io.dart';
 class ThumbnailCache {
   ThumbnailCache._();
 
-  static const int cacheVersion = 5;
+  static const int cacheVersion = 6;
 
   static Future<Directory> resolveDirectory() async {
     final supportDir = await getApplicationSupportDirectory();

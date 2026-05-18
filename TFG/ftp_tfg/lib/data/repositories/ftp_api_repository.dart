@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:universal_io/io.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -213,24 +212,6 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     );
     try {
       if (FileUtils.isVideo(file.name)) {
-        if (Platform.isAndroid || Platform.isIOS) {
-          try {
-            final generated = await VideoThumbnail.thumbnailFile(
-              video: sourcePath,
-              thumbnailPath: thumbnailPath,
-              imageFormat: ImageFormat.PNG,
-              maxHeight: 160,
-              maxWidth: 160,
-              quality: 100,
-            );
-            if (generated != null && generated.isNotEmpty) {
-              return generated;
-            }
-          } catch (_) {
-            // Fall back to a generated poster if the native plugin is not
-            // available in the current session.
-          }
-        }
         return ThumbnailUtils.buildVideoPlaceholderThumbnail(
           thumbnailPath: thumbnailPath,
         );

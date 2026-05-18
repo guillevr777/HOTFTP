@@ -81,10 +81,7 @@ class HotftpApiClient {
     required String remotePath,
     required String localFilePath,
   }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      _uri('/api/v1/files/upload'),
-    );
+    final request = http.MultipartRequest('POST', _uri('/api/v1/files/upload'));
     request.fields['ownerId'] = ownerId;
     request.fields['profileId'] = profileId.toString();
     request.fields['remotePath'] = remotePath;
@@ -108,7 +105,10 @@ class HotftpApiClient {
     required String fileName,
     required String targetLocalPath,
   }) async {
-    final response = await http.get(
+    final file = File(targetLocalPath);
+    await file.parent.create(recursive: true);
+    final request = http.Request(
+      'GET',
       _uri('/api/v1/files/download', {
         'ownerId': ownerId,
         'profileId': profileId,
@@ -116,10 +116,18 @@ class HotftpApiClient {
         'fileName': fileName,
       }),
     );
-    _ensureSuccess(response);
-    final file = File(targetLocalPath);
-    await file.parent.create(recursive: true);
-    await file.writeAsBytes(response.bodyBytes);
+    final streamed = await request.send();
+    if (!_isSuccessfulStatus(streamed.statusCode, {200})) {
+      final response = await http.Response.fromStream(streamed);
+      _ensureSuccess(response);
+    }
+
+    final sink = file.openWrite(mode: FileMode.writeOnly);
+    try {
+      await streamed.stream.pipe(sink);
+    } finally {
+      await sink.close();
+    }
   }
 
   Future<void> deleteRemoteFile({
@@ -152,10 +160,7 @@ class HotftpApiClient {
     int limit = 20,
   }) async {
     final response = await http.get(
-      _uri('/api/v1/monitoring/events', {
-        'ownerId': ownerId,
-        'limit': limit,
-      }),
+      _uri('/api/v1/monitoring/events', {'ownerId': ownerId, 'limit': limit}),
     );
     _ensureSuccess(response);
     return _decodeList(response.body);
@@ -175,9 +180,7 @@ class HotftpApiClient {
     return _decodeList(response.body);
   }
 
-  Future<Map<String, dynamic>> createAlert(
-    Map<String, dynamic> alert,
-  ) async {
+  Future<Map<String, dynamic>> createAlert(Map<String, dynamic> alert) async {
     final response = await http.post(
       _uri('/api/v1/monitoring/alerts'),
       headers: _jsonHeaders,
@@ -314,8 +317,8 @@ class HotftpApiClient {
   }
 
   static Map<String, String> get _jsonHeaders => const {
-        'Content-Type': 'application/json; charset=utf-8',
-      };
+    'Content-Type': 'application/json; charset=utf-8',
+  };
 
   static List<Map<String, dynamic>> _decodeList(String body) {
     final decoded = jsonDecode(body);
@@ -334,5 +337,12 @@ class HotftpApiClient {
       'API request failed with ${response.statusCode}: ${response.body}',
       uri: response.request?.url,
     );
+  }
+
+  static bool _isSuccessfulStatus(
+    int statusCode,
+    Set<int> expectedStatusCodes,
+  ) {
+    return expectedStatusCodes.contains(statusCode);
   }
 }

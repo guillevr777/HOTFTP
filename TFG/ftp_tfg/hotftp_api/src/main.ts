@@ -9,9 +9,7 @@ async function bootstrap() {
   const dependencies = await createDependencies(env);
   const app = createApp(dependencies);
 
-  app.listen(env.port, '0.0.0.0', () => {
-    console.log(`HOTFTP API listening on port ${env.port}`);
-  });
+  app.listen(env.port, '0.0.0.0');
 }
 
 void bootstrap();

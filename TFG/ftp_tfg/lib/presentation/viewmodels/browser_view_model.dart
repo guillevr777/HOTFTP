@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'dart:async';
-import 'dart:collection';
+
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -66,7 +66,8 @@ class BrowserViewModel extends ChangeNotifier {
   bool isTransferring = false;
   Map<String, String> thumbnails = {};
   final Map<String, List<RemoteFile>> _remoteCache = {};
-  final Queue<_ThumbnailRequest> _thumbnailQueue = Queue<_ThumbnailRequest>();
+  final List<_ThumbnailRequest> _priorityThumbnailQueue = [];
+  final List<_ThumbnailRequest> _thumbnailQueue = [];
   final Set<String> _queuedThumbnailPaths = {};
   final Set<String> _loadingThumbnailPaths = {};
   int _activeThumbnailLoads = 0;
@@ -265,11 +266,11 @@ class BrowserViewModel extends ChangeNotifier {
     }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
       try {
-      final latest = await getLatestFileVersion.execute(
-        ownerId,
-        profile.id!,
-        file.path,
-      );
+        final latest = await getLatestFileVersion.execute(
+          ownerId,
+          profile.id!,
+          file.path,
+        );
         final modifiedAt = file.modifiedAt;
         final hasChanged =
             latest == null ||
@@ -362,7 +363,24 @@ class BrowserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void requestThumbnail(RemoteFile file, String remotePath) {
+  void prioritizeVisibleThumbnails(
+    Iterable<RemoteFile> files,
+    String remotePath,
+  ) {
+    for (final file in files) {
+      if (file.isDirectory) continue;
+      if (!FileUtils.isImage(file.name) && !FileUtils.isVideo(file.name)) {
+        continue;
+      }
+      requestThumbnail(file, remotePath, highPriority: true);
+    }
+  }
+
+  void requestThumbnail(
+    RemoteFile file,
+    String remotePath, {
+    bool highPriority = false,
+  }) {
     final isImage = FileUtils.isImage(file.name);
     final isVideo = FileUtils.isVideo(file.name);
     if (!isImage && !isVideo) return;
@@ -374,11 +392,19 @@ class BrowserViewModel extends ChangeNotifier {
     if (thumbnails.containsKey(file.path)) return;
     if (_queuedThumbnailPaths.contains(file.path) ||
         _loadingThumbnailPaths.contains(file.path)) {
+      if (highPriority) {
+        _promoteQueuedThumbnail(file, remotePath);
+      }
       return;
     }
 
     _queuedThumbnailPaths.add(file.path);
-    _thumbnailQueue.add(_ThumbnailRequest(file: file, remotePath: remotePath));
+    final request = _ThumbnailRequest(file: file, remotePath: remotePath);
+    if (highPriority) {
+      _priorityThumbnailQueue.add(request);
+    } else {
+      _thumbnailQueue.add(request);
+    }
     _pumpThumbnailQueue();
   }
 
@@ -393,14 +419,30 @@ class BrowserViewModel extends ChangeNotifier {
   }
 
   void _pumpThumbnailQueue() {
-    while (_activeThumbnailLoads < _maxConcurrentThumbnailLoads &&
-        _thumbnailQueue.isNotEmpty) {
-      final request = _thumbnailQueue.removeFirst();
+    while (_activeThumbnailLoads < _maxConcurrentThumbnailLoads) {
+      final request = _priorityThumbnailQueue.isNotEmpty
+          ? _priorityThumbnailQueue.removeAt(0)
+          : _thumbnailQueue.isNotEmpty
+          ? _thumbnailQueue.removeAt(0)
+          : null;
+      if (request == null) return;
       _queuedThumbnailPaths.remove(request.file.path);
       _loadingThumbnailPaths.add(request.file.path);
       _activeThumbnailLoads++;
       unawaited(_runThumbnailRequest(request));
     }
+  }
+
+  void _promoteQueuedThumbnail(RemoteFile file, String remotePath) {
+    final promoted = _ThumbnailRequest(file: file, remotePath: remotePath);
+    _thumbnailQueue.removeWhere((request) => request.file.path == file.path);
+    if (_priorityThumbnailQueue.any(
+      (request) => request.file.path == file.path,
+    )) {
+      return;
+    }
+    _priorityThumbnailQueue.add(promoted);
+    _pumpThumbnailQueue();
   }
 
   Future<void> _runThumbnailRequest(_ThumbnailRequest request) async {

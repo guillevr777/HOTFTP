@@ -11,13 +11,7 @@ class FileUtils {
     'tiff',
   };
 
-  static const videoExtensions = {
-    'mp4',
-    'mov',
-    'avi',
-    'mkv',
-    'webm',
-  };
+  static const videoExtensions = {'mp4', 'mov', 'avi', 'mkv', 'webm'};
 
   static const documentExtensions = {
     'pdf',
@@ -36,13 +30,24 @@ class FileUtils {
     'csv',
   };
 
-  static const archiveExtensions = {
-    'zip',
-    'rar',
-    '7z',
-    'tar',
-    'gz',
+  static const textExtensions = {
+    'txt',
+    'md',
+    'json',
+    'xml',
+    'csv',
+    'log',
+    'yaml',
+    'yml',
+    'ini',
+    'conf',
+    'toml',
+    'sh',
+    'bat',
+    'ps1',
   };
+
+  static const archiveExtensions = {'zip', 'rar', '7z', 'tar', 'gz'};
 
   static String extensionOf(String fileName) {
     if (!fileName.contains('.')) return '';
@@ -65,6 +70,10 @@ class FileUtils {
     return archiveExtensions.contains(extensionOf(fileName));
   }
 
+  static bool isTextFile(String fileName) {
+    return textExtensions.contains(extensionOf(fileName));
+  }
+
   static String fileCategory(String fileName, {bool isDirectory = false}) {
     if (isDirectory) return 'Carpeta';
     if (isImage(fileName)) return 'Imagen';
@@ -85,8 +94,18 @@ class FileUtils {
       'doc' || 'docx' || 'odt' || 'rtf' => Icons.description_outlined,
       'xls' || 'xlsx' || 'csv' => Icons.table_chart_outlined,
       'ppt' || 'pptx' => Icons.slideshow_outlined,
-      'txt' || 'md' => Icons.text_snippet_outlined,
       'json' || 'xml' => Icons.data_object_outlined,
+      'txt' ||
+      'md' ||
+      'log' ||
+      'yaml' ||
+      'yml' ||
+      'ini' ||
+      'conf' ||
+      'toml' ||
+      'sh' ||
+      'bat' ||
+      'ps1' => Icons.text_snippet_outlined,
       'zip' || 'rar' || '7z' || 'tar' || 'gz' => Icons.folder_zip_outlined,
       _ => Icons.insert_drive_file_outlined,
     };
@@ -103,8 +122,18 @@ class FileUtils {
       'doc' || 'docx' || 'odt' || 'rtf' => const Color(0xFF5B8DEF),
       'xls' || 'xlsx' || 'csv' => const Color(0xFF2EA043),
       'ppt' || 'pptx' => const Color(0xFFFF9D00),
-      'txt' || 'md' => const Color(0xFF8B949E),
       'json' || 'xml' => const Color(0xFF9C6ADE),
+      'txt' ||
+      'md' ||
+      'log' ||
+      'yaml' ||
+      'yml' ||
+      'ini' ||
+      'conf' ||
+      'toml' ||
+      'sh' ||
+      'bat' ||
+      'ps1' => const Color(0xFF8B949E),
       'zip' || 'rar' || '7z' || 'tar' || 'gz' => const Color(0xFFDA7A1F),
       _ => const Color(0xFF8B949E),
     };
