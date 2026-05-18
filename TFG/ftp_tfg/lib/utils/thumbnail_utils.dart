@@ -50,20 +50,46 @@ class ThumbnailUtils {
     await outFile.parent.create(recursive: true);
 
     final bytes = await sourceFile.readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      await _buildImagePlaceholderThumbnail(
-        thumbnailPath: thumbnailPath,
-        size: maxDimension,
-      );
-      return outFile.path;
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded != null) {
+        final oriented = img.bakeOrientation(decoded);
+        final resized = oriented.width >= oriented.height
+            ? img.copyResize(oriented, width: maxDimension)
+            : img.copyResize(oriented, height: maxDimension);
+        await outFile.writeAsBytes(img.encodePng(resized), flush: true);
+        return outFile.path;
+      }
+    } catch (_) {
+      // Some camera JPEGs are partially invalid; try Flutter's decoder next.
     }
 
-    final oriented = img.bakeOrientation(decoded);
-    final resized = oriented.width >= oriented.height
-        ? img.copyResize(oriented, width: maxDimension)
-        : img.copyResize(oriented, height: maxDimension);
-    await outFile.writeAsBytes(img.encodePng(resized), flush: true);
+    final codec = await _safeCodec(bytes, maxDimension);
+    if (codec != null) {
+      try {
+        final frame = await codec.getNextFrame();
+        final byteData = await frame.image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        if (byteData != null) {
+          await outFile.writeAsBytes(
+            byteData.buffer.asUint8List(),
+            flush: true,
+          );
+          codec.dispose();
+          return outFile.path;
+        }
+      } catch (_) {
+        // Fall through to a clean placeholder.
+      } finally {
+        codec.dispose();
+      }
+    }
+
+    await _buildImagePlaceholderThumbnail(
+      thumbnailPath: thumbnailPath,
+      size: maxDimension,
+    );
     return outFile.path;
   }
 

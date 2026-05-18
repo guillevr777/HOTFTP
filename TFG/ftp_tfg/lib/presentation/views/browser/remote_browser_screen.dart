@@ -15,6 +15,8 @@ import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/file_utils.dart';
+import '../../../utils/thumbnail_cache.dart';
+import '../../../utils/thumbnail_utils.dart';
 import '../../viewmodels/browser_view_model.dart';
 import '../history/history_screen.dart';
 import '../sync/sync_screen.dart';
@@ -690,10 +692,10 @@ class _GridPreviewState extends State<_GridPreview> {
                   errorBuilder: (context, error, stackTrace) {
                     if (!_retryScheduledForCurrentThumb) {
                       _retryScheduledForCurrentThumb = true;
+                      final vm = context.read<BrowserViewModel>();
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         unawaited(() async {
                           if (!mounted) return;
-                          final vm = context.read<BrowserViewModel>();
                           vm.invalidateThumbnail(widget.file.path);
                           if (existingThumbFile.existsSync()) {
                             await existingThumbFile.delete();
@@ -783,14 +785,16 @@ class _FilePreviewScreen extends StatefulWidget {
 }
 
 class _FilePreviewScreenState extends State<_FilePreviewScreen> {
-  late final Future<String?> _previewFileFuture;
   late final _PreviewKind _previewKind;
+  String? _previewPath;
+  bool _previewLoading = true;
+  bool _imagePreviewWarming = false;
 
   @override
   void initState() {
     super.initState();
     _previewKind = _previewKindFor(widget.file.name);
-    _previewFileFuture = _loadPreviewFile();
+    _initPreview();
   }
 
   @override
@@ -896,45 +900,116 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
                 ],
               ),
             )
-          : FutureBuilder<String?>(
-              future: _previewFileFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          : _buildPreviewBody(icon, color),
+    );
+  }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'No se pudo preparar la vista previa',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
+  Widget _buildPreviewBody(IconData icon, Color color) {
+    if (_previewLoading && _previewPath == null) {
+      return _buildLoadingPreviewBody(icon, color);
+    }
+
+    final previewPath = _previewPath;
+    if (previewPath == null || !File(previewPath).existsSync()) {
+      if (_previewKind == _PreviewKind.image) {
+        return _buildOtherFileView(icon, color);
+      }
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return switch (_previewKind) {
+      _PreviewKind.image => _ImagePreviewViewport(filePath: previewPath),
+      _PreviewKind.video => _VideoPreviewViewport(filePath: previewPath),
+      _PreviewKind.pdf => SafeArea(child: SfPdfViewer.file(File(previewPath))),
+      _PreviewKind.other => _buildOtherFileView(icon, color),
+    };
+  }
+
+  Widget _buildLoadingPreviewBody(IconData icon, Color color) {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            colors: [
+                              color.withValues(alpha: 0.22),
+                              AppTheme.surfaceVariant,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 88, color: color),
+                                const SizedBox(height: 18),
+                                const SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 24),
+                                  child: Text(
+                                    'Preparando vista previa',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppTheme.onSurfaceMuted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                }
-
-                final previewPath = snapshot.data;
-                if (previewPath == null || !File(previewPath).existsSync()) {
-                  return _buildOtherFileView(icon, color);
-                }
-
-                return switch (_previewKind) {
-                  _PreviewKind.image => _ImagePreviewViewport(
-                    filePath: previewPath,
-                  ),
-                  _PreviewKind.video => _VideoPreviewViewport(
-                    filePath: previewPath,
-                  ),
-                  _PreviewKind.pdf => SafeArea(
-                    child: SfPdfViewer.file(File(previewPath)),
-                  ),
-                  _PreviewKind.other => _buildOtherFileView(icon, color),
-                };
-              },
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.file.name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'La vista previa se descargará y se guardará en caché.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                    ),
+                  ],
+                ),
+              ),
             ),
+          );
+        },
+      ),
     );
   }
 
@@ -987,14 +1062,103 @@ class _FilePreviewScreenState extends State<_FilePreviewScreen> {
     final hashInput =
         '${widget.file.path}|${widget.file.size}|${widget.file.modifiedAt?.toIso8601String() ?? ''}';
     final key = sha1.convert(utf8.encode(hashInput)).toString();
-    final previewFilePath = p.join(previewDir.path, key, widget.file.name);
-    final previewFile = File(previewFilePath);
-    if (await previewFile.exists()) return previewFilePath;
+    final previewFilePath = p.join(previewDir.path, '$key.preview.png');
+    if (await ThumbnailUtils.isReadableImageFile(previewFilePath)) {
+      return previewFilePath;
+    }
 
-    await widget.downloadFileUseCase
-        .execute(widget.file, p.dirname(previewFilePath), widget.profile)
-        .timeout(const Duration(seconds: 30));
-    return previewFilePath;
+    final sourceDir = Directory(p.join(previewDir.path, '$key.source'));
+    await sourceDir.create(recursive: true);
+    final sourcePath = p.join(sourceDir.path, widget.file.name);
+    try {
+      await widget.downloadFileUseCase
+          .execute(widget.file, sourceDir.path, widget.profile)
+          .timeout(const Duration(seconds: 30));
+
+      if (_previewKind == _PreviewKind.image) {
+        return ThumbnailUtils.buildThumbnailFromFile(
+          sourcePath: sourcePath,
+          thumbnailPath: previewFilePath,
+          maxDimension: 1600,
+        );
+      }
+
+      return sourcePath;
+    } finally {
+      if (_previewKind == _PreviewKind.image) {
+        final sourceFile = File(sourcePath);
+        if (sourceFile.existsSync()) {
+          await sourceFile.delete();
+        }
+        if (sourceDir.existsSync()) {
+          await sourceDir.delete(recursive: true);
+        }
+      }
+    }
+  }
+
+  Future<void> _initPreview() async {
+    if (_previewKind == _PreviewKind.other) {
+      setState(() {
+        _previewLoading = false;
+      });
+      return;
+    }
+
+    try {
+      if (_previewKind == _PreviewKind.image) {
+        final thumbPath = await _thumbCachePath();
+        if (thumbPath != null &&
+            await ThumbnailUtils.isReadableImageFile(thumbPath)) {
+          setState(() {
+            _previewPath = thumbPath;
+            _previewLoading = false;
+          });
+          _warmImagePreview();
+          return;
+        }
+      }
+
+      final previewPath = await _loadPreviewFile();
+      if (!mounted) return;
+      setState(() {
+        _previewPath = previewPath;
+        _previewLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _previewLoading = false;
+      });
+    }
+  }
+
+  Future<String?> _thumbCachePath() async {
+    final cacheDir = await ThumbnailCache.resolveDirectory();
+    final cacheKey = ThumbnailCache.buildKey(
+      filePath: widget.file.path,
+      fileName: widget.file.name,
+      fileSize: widget.file.size,
+      modifiedAt: widget.file.modifiedAt,
+      profileId: widget.profile.id ?? 0,
+      isVideo: false,
+    );
+    return p.join(cacheDir.path, '$cacheKey.png');
+  }
+
+  void _warmImagePreview() {
+    if (_imagePreviewWarming || _previewKind != _PreviewKind.image) return;
+    _imagePreviewWarming = true;
+    unawaited(() async {
+      try {
+        final previewPath = await _loadPreviewFile();
+        if (!mounted || previewPath == null) return;
+        if (_previewPath == previewPath) return;
+        setState(() {
+          _previewPath = previewPath;
+        });
+      } catch (_) {}
+    }());
   }
 
   Future<void> _showDetailsSheet(BuildContext context) async {
@@ -1108,26 +1272,35 @@ class _ImagePreviewViewport extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.black,
-      child: Center(
-        child: InteractiveViewer(
-          minScale: 1,
-          maxScale: 5,
-          child: Image.file(
-            File(filePath),
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            errorBuilder: (context, error, stackTrace) {
-              return const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'No se pudo mostrar la imagen',
-                  style: TextStyle(color: Colors.white),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            },
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return InteractiveViewer(
+            minScale: 1,
+            maxScale: 5,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              child: Image.file(
+                File(filePath),
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.high,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No se pudo mostrar la imagen',
+                        style: TextStyle(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1153,7 +1326,7 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
     _controller = VideoPlayerController.file(File(widget.filePath));
     _initFuture = _controller.initialize().then((_) {
       _controller.setLooping(true);
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
@@ -1182,7 +1355,57 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done ||
             !_controller.value.isInitialized) {
-          return const Center(child: CircularProgressIndicator());
+          return SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SizedBox.expand(
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AspectRatio(
+                              aspectRatio: 1,
+                              child: Container(
+                                margin: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 24),
+                              child: Text(
+                                'Preparando video',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
         }
 
         return GestureDetector(
@@ -1195,11 +1418,19 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: Colors.black),
-              Center(
-                child: AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio,
-                  child: VideoPlayer(_controller),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Center(
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: SizedBox(
+                        width: _controller.value.size.width,
+                        height: _controller.value.size.height,
+                        child: VideoPlayer(_controller),
+                      ),
+                    ),
+                  );
+                },
               ),
               if (_controlsVisible)
                 Align(

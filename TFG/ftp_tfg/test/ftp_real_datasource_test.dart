@@ -63,4 +63,18 @@ void main() {
     expect(ftp.listCalls, 0);
     expect(sftp.listCalls, 1);
   });
+
+  test('routes SFTP requests even when protocol is serialized differently', () async {
+    final ftp = _FakeFtpClient();
+    final sftp = _FakeSftpClient();
+    final datasource = FtpRealDatasource(client: ftp, sftpClient: sftp);
+
+    await datasource.listRemoteFiles(
+      '/',
+      {'protocol': 'FtpProtocolType.sftp'},
+    );
+
+    expect(ftp.listCalls, 0);
+    expect(sftp.listCalls, 1);
+  });
 }

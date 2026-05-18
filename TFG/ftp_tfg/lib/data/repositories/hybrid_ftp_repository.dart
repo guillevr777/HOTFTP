@@ -21,18 +21,6 @@ class HybridFtpRepositoryImpl implements FtpRepository {
         : remoteRepository;
   }
 
-  String _profileSignature(FtpProfile profile) {
-    return [
-      profile.name.trim().toLowerCase(),
-      profile.host.trim().toLowerCase(),
-      profile.port,
-      profile.username.trim().toLowerCase(),
-      profile.password,
-      profile.protocol.name,
-      profile.passiveMode,
-    ].join('|');
-  }
-
   @override
   Future<List<RemoteFile>> getRemoteFiles(String path, FtpProfile profile) =>
       _repositoryFor(profile).getRemoteFiles(path, profile);
@@ -83,39 +71,7 @@ class HybridFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<List<FtpProfile>> getProfiles(String ownerId) async {
-    List<FtpProfile> remote = [];
-    var remoteAvailable = true;
-    try {
-      remote = await remoteRepository.getProfiles(ownerId);
-    } catch (_) {
-      remoteAvailable = false;
-    }
-
-    try {
-      final local = await localRepository.getProfiles(ownerId);
-      if (remoteAvailable) {
-        final remoteSignatures = remote.map(_profileSignature).toSet();
-        var migrated = false;
-
-        for (final profile in local) {
-          final signature = _profileSignature(profile);
-          if (remoteSignatures.contains(signature)) continue;
-
-          await remoteRepository.saveProfile(
-            profile.copyWith(id: null, ownerId: ownerId),
-            ownerId,
-          );
-          migrated = true;
-        }
-
-        if (migrated) {
-          remote = await remoteRepository.getProfiles(ownerId);
-        }
-      } else {
-        remote = local;
-      }
-    } catch (_) {}
-
+    final remote = await remoteRepository.getProfiles(ownerId);
     remote.sort((a, b) {
       final nameCompare = a.name.toLowerCase().compareTo(b.name.toLowerCase());
       if (nameCompare != 0) return nameCompare;
@@ -138,28 +94,22 @@ class HybridFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<List<SyncRecord>> getSyncHistory(String ownerId) async {
-    final local = await localRepository.getSyncHistory(ownerId);
-    List<SyncRecord> remote = [];
-    try {
-      remote = await remoteRepository.getSyncHistory(ownerId);
-    } catch (_) {}
-
-    final merged = [...local, ...remote];
-    merged.sort((a, b) => b.date.compareTo(a.date));
-    return merged;
+    final remote = await remoteRepository.getSyncHistory(ownerId);
+    remote.sort((a, b) => b.date.compareTo(a.date));
+    return remote;
   }
 
   @override
   Future<void> saveSyncRecord(SyncRecord record, FtpProfile profile) =>
-      _repositoryFor(profile).saveSyncRecord(record, profile);
+      remoteRepository.saveSyncRecord(record, profile);
 
   @override
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
     FtpProfile profile,
-  ) => _repositoryFor(profile).getDumpScheduleForProfile(ownerId, profile);
+  ) => remoteRepository.getDumpScheduleForProfile(ownerId, profile);
 
   @override
   Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
-      _repositoryFor(profile).saveDumpSchedule(schedule, profile);
+      remoteRepository.saveDumpSchedule(schedule, profile);
 }

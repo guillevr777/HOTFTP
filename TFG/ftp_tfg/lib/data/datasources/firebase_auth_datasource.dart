@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -13,7 +14,15 @@ class FirebaseAuthDatasource {
 
   FirebaseAuthDatasource({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
     : _auth = auth ?? FirebaseAuth.instance,
-      _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+      _googleSignIn = googleSignIn ?? GoogleSignIn.instance {
+    // Make auth emails use the app language when possible.
+    // If the locale is unavailable, Firebase falls back to its default language.
+    final locale = ui.PlatformDispatcher.instance.locale;
+    final languageCode = locale.languageCode.trim();
+    if (languageCode.isNotEmpty) {
+      _auth.setLanguageCode(languageCode);
+    }
+  }
 
   Future<void> _ensureGoogleInitialized() async {
     if (_googleInitialized) return;

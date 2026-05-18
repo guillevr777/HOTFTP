@@ -11,7 +11,7 @@ export interface FtpConnectionConfig {
   port: number;
   user: string;
   password: string;
-  secure: boolean;
+  secure: boolean | 'implicit';
 }
 
 export class BasicFtpGateway implements FtpGateway {
@@ -144,12 +144,15 @@ export class BasicFtpGateway implements FtpGateway {
   }
 
   private toConfig(profile: FtpProfile): FtpConnectionConfig {
+    const useImplicitFtps = profile.protocol === 'ftps' && profile.port === 990;
     return {
       host: profile.host || this.fallbackConfig.host,
       port: profile.port || this.fallbackConfig.port,
       user: profile.username || this.fallbackConfig.user,
       password: profile.password || this.fallbackConfig.password,
-      secure: profile.protocol === 'ftps' || this.fallbackConfig.secure,
+      secure: profile.protocol === 'ftps'
+        ? (useImplicitFtps ? 'implicit' : true)
+        : this.fallbackConfig.secure,
     };
   }
 

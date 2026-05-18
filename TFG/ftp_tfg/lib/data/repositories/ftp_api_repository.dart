@@ -10,7 +10,6 @@ import '../../domain/entities/remote_file.dart';
 import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
-import '../../core/services/connection_route_resolver.dart';
 import '../../utils/file_utils.dart';
 import '../../utils/thumbnail_cache.dart';
 import '../mappers/remote_file_mapper.dart';
@@ -19,7 +18,6 @@ import '../../utils/thumbnail_utils.dart';
 
 class ApiFtpRepositoryImpl implements FtpRepository {
   final HotftpApiClient client;
-  static const _routeResolver = ConnectionRouteResolver();
 
   ApiFtpRepositoryImpl(this.client);
 
@@ -293,12 +291,7 @@ class ApiFtpRepositoryImpl implements FtpRepository {
 
   @override
   Future<int> saveProfile(FtpProfile profile, String ownerId) async {
-    final payload = _profilePayload(
-      profile.copyWith(
-        transportType: _routeResolver.resolveTransportType(profile.host),
-      ),
-      ownerId,
-    );
+    final payload = _profilePayload(profile, ownerId);
     final saved = await client.saveProfile(payload);
     final savedProfile = FtpProfile.fromMap(saved);
     return savedProfile.id ?? profile.id ?? 0;

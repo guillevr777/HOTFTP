@@ -78,12 +78,7 @@ class FtpProfile {
           map['transportType'],
           defaultTransportType,
         ),
-        protocol: FtpProtocolType.values.firstWhere(
-          (value) => value.name == map['protocol'],
-          orElse: () => _asBool(map['useFTPS'])
-              ? FtpProtocolType.ftps
-              : FtpProtocolType.ftp,
-        ),
+        protocol: _protocolFromValue(map['protocol'], map['useFTPS']),
         name: map['name'],
         host: map['host'],
         port: map['port'],
@@ -104,6 +99,20 @@ class FtpProfile {
       'api' || 'remote' => FtpTransportType.api,
       _ => fallback,
     };
+  }
+
+  static FtpProtocolType _protocolFromValue(Object? value, Object? useFTPS) {
+    final raw = '${value ?? ''}'.trim().toLowerCase();
+    if (raw == 'ftp' || raw.endsWith('.ftp')) {
+      return FtpProtocolType.ftp;
+    }
+    if (raw == 'sftp' || raw.endsWith('.sftp')) {
+      return FtpProtocolType.sftp;
+    }
+    if (raw == 'ftps' || raw.endsWith('.ftps')) {
+      return FtpProtocolType.ftps;
+    }
+    return _asBool(useFTPS) ? FtpProtocolType.ftps : FtpProtocolType.ftp;
   }
 
   static bool _asBool(Object? value) {

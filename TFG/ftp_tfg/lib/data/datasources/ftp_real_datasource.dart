@@ -12,7 +12,15 @@ class FtpRealDatasource implements FtpDatasource {
       : _client = client ?? HotftpFtpClient(),
         _sftpClient = sftpClient ?? HotftpSftpClient();
 
-  bool _usesSftp(Map<String, dynamic> config) => '${config['protocol']}' == 'sftp';
+  bool _usesSftp(Map<String, dynamic> config) {
+    final raw = config['protocol'];
+    if (raw is Enum) {
+      return raw.name.toLowerCase() == 'sftp';
+    }
+    final normalized = '${raw ?? ''}'.trim().toLowerCase();
+    return normalized == 'sftp' ||
+        normalized.endsWith('.sftp');
+  }
 
   @override
   Future<bool> testConnection(Map<String, dynamic> profile) =>

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/app_theme.dart';
@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
       SnackBar(
         content: Text(
           ok
-              ? 'Te hemos enviado un correo para restablecer la contraseÃ±a.'
+              ? 'Te hemos enviado un correo para restablecer la contraseÃ±a. Revisa tambiÃ©n spam.'
               : vm.error ?? 'No se pudo enviar el correo de recuperaciÃ³n',
         ),
         backgroundColor: ok ? AppTheme.success : AppTheme.error,
@@ -206,7 +206,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: vm.isLoading
                                   ? null
                                   : () => _forgotPassword(vm),
-                              child: const Text('Â¿Has olvidado tu contraseÃ±a?'),
+                              child: const Text(
+                                'Â¿Has olvidado tu contraseÃ±a?',
+                              ),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -250,6 +252,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-
-

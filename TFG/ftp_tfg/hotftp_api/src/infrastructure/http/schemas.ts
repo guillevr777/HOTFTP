@@ -14,7 +14,7 @@ export const profileSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().positive(),
   username: z.string().min(1),
-  password: z.string().min(1),
+  password: z.string().default(''),
   passiveMode: z.boolean().default(true),
 });
 

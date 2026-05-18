@@ -9,7 +9,7 @@ import 'package:ftp_tfg/domain/entities/sync_record.dart';
 import 'package:ftp_tfg/domain/repositories/ftp_repository.dart';
 
 void main() {
-  test('migrates local profiles to the remote repository', () async {
+  test('reads profiles only from the remote repository', () async {
     final local = _StubFtpRepository(
       profiles: [
         FtpProfile(
@@ -23,7 +23,19 @@ void main() {
         ),
       ],
     );
-    final remote = _StubFtpRepository();
+    final remote = _StubFtpRepository(
+      profiles: [
+        FtpProfile(
+          id: 11,
+          ownerId: 'owner-1',
+          name: 'Servidor nube',
+          host: 'cloud.example.com',
+          port: 21,
+          username: 'cloud',
+          password: 'cloud',
+        ),
+      ],
+    );
     final repo = HybridFtpRepositoryImpl(
       localRepository: local,
       remoteRepository: remote,
@@ -31,11 +43,10 @@ void main() {
 
     final profiles = await repo.getProfiles('owner-1');
 
-    expect(remote.saveCalls, 1);
+    expect(remote.saveCalls, 0);
     expect(profiles, hasLength(1));
-    expect(remote.profiles, hasLength(1));
-    expect(remote.profiles.first.ownerId, 'owner-1');
-    expect(remote.profiles.first.id, 101);
+    expect(profiles.first.name, 'Servidor nube');
+    expect(local.saveCalls, 0);
   });
 
   test('saves and deletes profiles through the remote repository', () async {

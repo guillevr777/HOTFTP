@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -177,6 +177,10 @@ class AuthViewModel extends ChangeNotifier {
       if (message.startsWith('FirebaseAuthException')) {
         final details = message.split('] ').last;
         switch (details) {
+          case 'operation-not-allowed':
+            return 'La recuperaciÃ³n por correo no estÃ¡ habilitada en Firebase.';
+          case 'too-many-requests':
+            return 'Se han hecho demasiados intentos. Espera un poco y vuelve a probar.';
           case 'provider-already-linked':
             return 'La cuenta ya tiene este mÃ©todo de acceso vinculado.';
           case 'missing-email':
@@ -187,6 +191,8 @@ class AuthViewModel extends ChangeNotifier {
             return 'Ese correo ya estÃ¡ registrado.';
           case 'invalid-email':
             return 'El correo no tiene un formato vÃ¡lido.';
+          case 'invalid-recipient-email':
+            return 'El correo de destino no es vÃ¡lido para recuperar contraseÃ±a.';
           case 'weak-password':
             return 'La contraseÃ±a es demasiado dÃ©bil.';
           case 'requires-recent-login':
@@ -212,7 +218,3 @@ class AuthViewModel extends ChangeNotifier {
     super.dispose();
   }
 }
-
-
-
-

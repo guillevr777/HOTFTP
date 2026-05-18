@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ftp_tfg/data/interfaces/ftp_datasource.dart';
 import 'package:ftp_tfg/data/repositories/ftp_repository.dart';
-import 'package:ftp_tfg/domain/entities/dump_schedule.dart';
 import 'package:ftp_tfg/domain/entities/ftp_profile.dart';
 
 class _SlowDatasource implements FtpDatasource {
@@ -17,8 +14,7 @@ class _SlowDatasource implements FtpDatasource {
   Future<List<Map<String, dynamic>>> listRemoteFiles(
     String path,
     Map<String, dynamic> config,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<List<String>> listLocalFiles(String path) =>
@@ -29,24 +25,21 @@ class _SlowDatasource implements FtpDatasource {
     String localFilePath,
     String remotePath,
     Map<String, dynamic> config,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<void> downloadFile(
     String remoteFileName,
     String localPath,
     Map<String, dynamic> config,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<void> deleteRemoteFile(
     String remoteFileName,
     String remoteDirectory,
     Map<String, dynamic> config,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 
   @override
   Future<void> downloadFileToPath(
@@ -54,8 +47,7 @@ class _SlowDatasource implements FtpDatasource {
     String remoteDirectory,
     String targetLocalPath,
     Map<String, dynamic> config,
-  ) =>
-      throw UnimplementedError();
+  ) => throw UnimplementedError();
 }
 
 void main() {

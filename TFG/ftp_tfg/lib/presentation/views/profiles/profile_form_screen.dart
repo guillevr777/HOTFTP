@@ -20,6 +20,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   late final TextEditingController _port;
   late final TextEditingController _user;
   late final TextEditingController _pass;
+  FtpTransportType _transportType = FtpTransportType.direct;
   bool _passiveMode = true;
   bool _obscurePass = true;
   FtpProtocolType _protocol = FtpProtocolType.ftp;
@@ -35,6 +36,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
     _port = TextEditingController(text: (p?.port ?? 21).toString());
     _user = TextEditingController(text: p?.username ?? '');
     _pass = TextEditingController(text: p?.password ?? '');
+    _transportType = p?.transportType ?? FtpTransportType.direct;
     _passiveMode = p?.passiveMode ?? true;
     _protocol = p?.protocol ?? FtpProtocolType.ftp;
   }
@@ -57,30 +59,10 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
         port: int.tryParse(_port.text) ?? 21,
         username: _user.text.trim(),
         password: _pass.text,
-        transportType: _resolveTransportType(_host.text.trim()),
+        transportType: _transportType,
         protocol: _protocol,
         passiveMode: _passiveMode,
       );
-
-  FtpTransportType _resolveTransportType(String host) {
-    final normalized = host.trim().toLowerCase();
-    if (normalized.isEmpty) return FtpTransportType.api;
-    if (normalized == 'localhost') return FtpTransportType.direct;
-
-    final ipv4 = RegExp(
-      r'^(?:\d{1,3}\.){3}\d{1,3}$',
-    ).hasMatch(normalized);
-    if (!ipv4) return FtpTransportType.api;
-
-    final parts = normalized.split('.').map(int.parse).toList();
-    final a = parts[0];
-    final b = parts[1];
-    if (a == 10 || a == 127) return FtpTransportType.direct;
-    if (a == 169 && b == 254) return FtpTransportType.direct;
-    if (a == 172 && b >= 16 && b <= 31) return FtpTransportType.direct;
-    if (a == 192 && b == 168) return FtpTransportType.direct;
-    return FtpTransportType.api;
-  }
 
   String _protocolLabel(FtpProtocolType protocol) {
     return switch (protocol) {
@@ -134,8 +116,9 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               const SizedBox(height: 12),
               _Field(
                 controller: _host,
-                label: 'Host / IP',
+                label: 'Host / DNS / IP',
                 icon: Icons.dns_outlined,
+                helperText: 'Ej: test.rebex.net o 194.108.117.16',
                 validator: (v) => v!.isEmpty ? 'Requerido' : null,
                 onChanged: (_) => setState(() {}),
               ),
@@ -161,8 +144,9 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                 controller: _pass,
                 obscureText: _obscurePass,
                 decoration: InputDecoration(
-                  labelText: 'Contrasena',
+                  labelText: 'Contrasena opcional',
                   prefixIcon: const Icon(Icons.lock_outline),
+                  helperText: 'Deja este campo vacio si el servidor no requiere clave',
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePass
@@ -173,7 +157,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                         setState(() => _obscurePass = !_obscurePass),
                   ),
                 ),
-                validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                validator: (_) => null,
               ),
               const SizedBox(height: 16),
               _SectionLabel('Opciones de conexion'),
@@ -181,12 +165,29 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               Card(
                 child: Column(
                   children: [
-                    DropdownButtonFormField<FtpProtocolType>(
-                      initialValue: _protocol,
-                      decoration: const InputDecoration(
-                        labelText: 'Protocolo FTP',
-                        prefixIcon: Icon(Icons.cloud_sync_outlined),
-                      ),
+                    _ChoiceField<FtpTransportType>(
+                      label: 'Ruta de conexion',
+                      icon: Icons.alt_route_outlined,
+                      value: _transportType,
+                      items: const [
+                        DropdownMenuItem(
+                          value: FtpTransportType.direct,
+                          child: Text('Directo'),
+                        ),
+                        DropdownMenuItem(
+                          value: FtpTransportType.api,
+                          child: Text('API'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _transportType = value);
+                      },
+                    ),
+                    const Divider(height: 1),
+                    _ChoiceField<FtpProtocolType>(
+                      label: 'Protocolo FTP',
+                      icon: Icons.cloud_sync_outlined,
+                      value: _protocol,
                       items: const [
                         DropdownMenuItem(
                           value: FtpProtocolType.ftp,
@@ -202,13 +203,17 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                         ),
                       ],
                       onChanged: (value) {
-                        if (value == null) return;
                         setState(() {
                           _protocol = value;
                           final currentPort = int.tryParse(_port.text);
                           if (value == FtpProtocolType.sftp &&
                               (currentPort == null || currentPort == 21)) {
                             _port.text = '22';
+                          } else if (value == FtpProtocolType.ftps &&
+                              (currentPort == null ||
+                                  currentPort == 22 ||
+                                  currentPort == 21)) {
+                            _port.text = '21';
                           } else if (value != FtpProtocolType.sftp &&
                               (currentPort == null || currentPort == 22)) {
                             _port.text = '21';
@@ -219,10 +224,14 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(Icons.security_outlined),
-                      title: const Text('Modo cifrado'),
+                      title: const Text('Modo de cifrado'),
                       subtitle: Text(_protocolLabel(_protocol)),
                       trailing: Chip(
-                        label: Text(_protocolLabel(_protocol)),
+                        label: Text(
+                          _protocol == FtpProtocolType.ftps
+                              ? '21 explícito'
+                              : _protocolLabel(_protocol),
+                        ),
                       ),
                     ),
                     const Divider(height: 1),
@@ -296,6 +305,7 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
+  final String? helperText;
 
   const _Field({
     required this.controller,
@@ -304,6 +314,7 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.validator,
     this.onChanged,
+    this.helperText,
   });
 
   @override
@@ -313,8 +324,46 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon),
+          helperText: helperText,
         ),
         validator: validator,
         onChanged: onChanged,
       );
+}
+
+class _ChoiceField<T> extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T> onChanged;
+
+  const _ChoiceField({
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          items: items,
+          onChanged: (selected) {
+            if (selected == null) return;
+            onChanged(selected);
+          },
+        ),
+      ),
+    );
+  }
 }

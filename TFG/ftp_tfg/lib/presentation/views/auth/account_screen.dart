@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/app_theme.dart';
@@ -261,7 +261,7 @@ class AccountScreen extends StatelessWidget {
                             SnackBar(
                               content: Text(
                                 ok
-                                    ? 'Correo de recuperaciÃ³n enviado.'
+                                    ? 'Correo de recuperaciÃ³n enviado. Revisa spam si no llega enseguida.'
                                     : authVm.error ??
                                           'No se pudo enviar el correo.',
                               ),
@@ -323,6 +323,3 @@ class _MethodChip extends StatelessWidget {
     );
   }
 }
-
-
-

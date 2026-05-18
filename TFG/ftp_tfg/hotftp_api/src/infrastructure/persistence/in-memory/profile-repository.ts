@@ -1,7 +1,5 @@
 import type { FtpProfile } from '../../../domain/entities/ftp-profile.js';
 import type { ProfileRepository } from '../../../domain/repositories/profile-repository.js';
-import { resolveTransportType } from '../../../domain/services/connection-route.js';
-
 export class InMemoryProfileRepository implements ProfileRepository {
   private nextId = 2;
   private profiles: FtpProfile[] = [
@@ -26,7 +24,10 @@ export class InMemoryProfileRepository implements ProfileRepository {
   async save(profile: FtpProfile): Promise<FtpProfile> {
     const normalized: FtpProfile = {
       ...profile,
-      transportType: resolveTransportType(profile.host),
+      transportType:
+        profile.transportType === 'api' || profile.transportType === 'direct'
+          ? profile.transportType
+          : 'api',
     };
     const index = this.profiles.findIndex(
       (item) => item.id === profile.id && item.ownerId === profile.ownerId,

@@ -38,4 +38,34 @@ void main() {
     expect(map['protocol'], 'sftp');
     expect(map['useFTPS'], 0);
   });
+
+  test('preserves empty passwords for passwordless servers', () {
+    final profile = FtpProfile(
+      name: 'No password',
+      host: 'test.rebex.net',
+      username: 'demo',
+      password: '',
+    );
+
+    final map = profile.toMap();
+    final roundTrip = FtpProfile.fromMap(map);
+
+    expect(roundTrip.password, isEmpty);
+    expect(roundTrip.username, 'demo');
+  });
+
+  test('parses legacy enum-style protocol values', () {
+    final profile = FtpProfile.fromMap({
+      'name': 'Legacy SFTP',
+      'host': 'test.rebex.net',
+      'port': 22,
+      'username': 'demo',
+      'password': 'password',
+      'protocol': 'FtpProtocolType.sftp',
+      'transportType': 'direct',
+    });
+
+    expect(profile.protocol, FtpProtocolType.sftp);
+    expect(profile.toMap()['protocol'], 'sftp');
+  });
 }

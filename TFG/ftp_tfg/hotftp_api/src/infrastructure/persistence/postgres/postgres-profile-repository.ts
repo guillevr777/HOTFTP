@@ -1,6 +1,5 @@
 import type { FtpProfile } from '../../../domain/entities/ftp-profile.js';
 import type { ProfileRepository } from '../../../domain/repositories/profile-repository.js';
-import { resolveTransportType } from '../../../domain/services/connection-route.js';
 import { HttpError } from '../../../shared/http/http-error.js';
 import type { PostgresDatabase } from './postgres-database.js';
 
@@ -38,7 +37,10 @@ export class PostgresProfileRepository implements ProfileRepository {
   async save(profile: FtpProfile): Promise<FtpProfile> {
     const normalized = {
       ...profile,
-      transportType: resolveTransportType(profile.host),
+      transportType:
+        profile.transportType === 'api' || profile.transportType === 'direct'
+          ? profile.transportType
+          : 'api',
     };
 
     if (profile.id == null) {

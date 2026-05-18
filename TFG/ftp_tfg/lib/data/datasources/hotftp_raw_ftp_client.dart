@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -252,10 +253,19 @@ class _RawFtpSession {
   final bool useFTPS;
   final bool passiveMode;
   final int timeoutSeconds = 30;
+  bool _encryptDataChannel = false;
 
-  RawSocket? _socket;
+  Socket? _socket;
+  StreamSubscription<List<int>>? _controlSubscription;
   bool _connected = false;
   bool _loggedIn = false;
+  String _controlPendingLine = '';
+  String? _controlReplyCode;
+  Object? _pendingControlError;
+  final List<String> _controlReplyLines = [];
+  final Queue<FTPReplyData> _receivedReplies = Queue<FTPReplyData>();
+  final Queue<Completer<FTPReplyData>> _waitingReplies =
+      Queue<Completer<FTPReplyData>>();
 
   _RawFtpSession({
     required this.host,
@@ -268,43 +278,136 @@ class _RawFtpSession {
 
   Future<void> connect() async {
     final timeout = Duration(seconds: timeoutSeconds);
+    if (useFTPS && port == 990) {
+      try {
+        await _connectAndLogin(
+          connectPort: port,
+          timeout: timeout,
+          implicitFtps: true,
+        );
+        return;
+      } catch (e) {
+        debugPrint(
+          'HOTFTP: FTPS implicit handshake failed on $host:$port, retrying explicit 21 -> $e',
+        );
+        await _disposeSocket();
+        await _connectAndLogin(
+          connectPort: 21,
+          timeout: timeout,
+          implicitFtps: false,
+        );
+        return;
+      }
+    }
+
+    await _connectAndLogin(
+      connectPort: port,
+      timeout: timeout,
+      implicitFtps: false,
+    );
+  }
+
+  Future<void> _connectAndLogin({
+    required int connectPort,
+    required Duration timeout,
+    required bool implicitFtps,
+  }) async {
     try {
-      if (useFTPS) {
-        _socket = await RawSecureSocket.connect(
+      if (useFTPS && implicitFtps) {
+        _socket = await SecureSocket.connect(
           host,
-          port,
+          connectPort,
           timeout: timeout,
           onBadCertificate: (_) => true,
         );
       } else {
-        _socket = await RawSocket.connect(host, port, timeout: timeout);
+        _socket = await Socket.connect(host, connectPort, timeout: timeout);
       }
     } catch (e) {
-      throw SocketException('Could not connect to $host:$port: $e');
+      throw SocketException('Could not connect to $host:$connectPort: $e');
     }
 
+    _startControlListener();
     await _readReply();
     _connected = true;
+
+    if (useFTPS && !implicitFtps) {
+      var authReply = await _send('AUTH TLS');
+      if (!authReply.isSuccess) {
+        authReply = await _send('AUTH SSL');
+        if (!authReply.isSuccess) {
+          throw FormatException('FTPS negotiation failed: ${authReply.message}');
+        }
+      }
+
+      await _controlSubscription?.cancel();
+      _controlSubscription = null;
+      _controlPendingLine = '';
+      _controlReplyCode = null;
+      _controlReplyLines.clear();
+      _receivedReplies.clear();
+
+      final securedSocket = await SecureSocket.secure(
+        _socket!,
+        onBadCertificate: (_) => true,
+      );
+      _socket = securedSocket;
+      _startControlListener();
+    }
+
     final userReply = await _send('USER $user');
     if (!userReply.isSuccess && userReply.code != 331) {
       throw FormatException('FTP login failed: ${userReply.message}');
     }
 
-    final passReply = userReply;
-    if (passReply.code == 331) {
+    if (userReply.code == 331) {
       final loginReply = await _send('PASS $password');
       if (!loginReply.isSuccess) {
         throw FormatException('FTP login failed: ${loginReply.message}');
       }
-    } else if (!passReply.isSuccess) {
-      throw FormatException('FTP login failed: ${passReply.message}');
+    } else if (!userReply.isSuccess) {
+      throw FormatException('FTP login failed: ${userReply.message}');
     }
 
     if (useFTPS) {
-      // Minimal FTPS baseline: the socket is already secure when using FTPS.
+      final pbszReply = await _send('PBSZ 0');
+      if (!pbszReply.isSuccess) {
+        throw FormatException('FTPS PBSZ failed: ${pbszReply.message}');
+      }
+      // Rebex requires TLS session resumption for PROT P, which Dart's TLS
+      // client does not provide here. PROT C keeps the control channel secure
+      // and allows the data channel to work reliably.
+      final protReply = await _send('PROT C');
+      if (!protReply.isSuccess) {
+        throw FormatException('FTPS PROT failed: ${protReply.message}');
+      }
+      _encryptDataChannel = false;
     }
 
     _loggedIn = true;
+  }
+
+  Future<void> _disposeSocket() async {
+    try {
+      await _controlSubscription?.cancel();
+    } catch (_) {}
+    _controlSubscription = null;
+    _controlPendingLine = '';
+    _controlReplyCode = null;
+    _pendingControlError = null;
+    _controlReplyLines.clear();
+    _receivedReplies.clear();
+    _waitingReplies.clear();
+    _connected = false;
+    _loggedIn = false;
+    _encryptDataChannel = false;
+    final socket = _socket;
+    _socket = null;
+    if (socket != null) {
+      try {
+        await socket.close();
+      } catch (_) {}
+    }
   }
 
   Future<void> changeDirectory(String path) async {
@@ -455,11 +558,22 @@ class _RawFtpSession {
     try {
       await _send('QUIT');
     } catch (_) {}
+    await _controlSubscription?.cancel();
+    _controlSubscription = null;
     await _socket!.close();
-    _socket!.shutdown(SocketDirection.both);
     _socket = null;
     _connected = false;
     _loggedIn = false;
+    _controlPendingLine = '';
+    _controlReplyCode = null;
+    _pendingControlError = null;
+    _controlReplyLines.clear();
+    _receivedReplies.clear();
+    while (_waitingReplies.isNotEmpty) {
+      _waitingReplies.removeFirst().completeError(
+        StateError('FTP session closed'),
+      );
+    }
   }
 
   void _ensureReady() {
@@ -527,19 +641,19 @@ class _RawFtpSession {
 
   Future<Socket> _connectDataSocket(int port) async {
     final timeout = Duration(seconds: timeoutSeconds);
-    if (useFTPS) {
-      return RawSecureSocket.connect(
-        host,
-        port,
-        timeout: timeout,
+    if (useFTPS && _encryptDataChannel) {
+      final socket = await Socket.connect(host, port, timeout: timeout);
+      return SecureSocket.secure(
+        socket,
         onBadCertificate: (_) => true,
-      ).then<Socket>((socket) => socket as Socket);
+      );
     }
     return Socket.connect(host, port, timeout: timeout);
   }
 
   Future<FTPReplyData> _send(String command, {bool waitForReply = true}) async {
-    _socket!.write(utf8.encode('$command\r\n'));
+    _socket!.add(utf8.encode('$command\r\n'));
+    await _socket!.flush();
     if (!waitForReply) {
       return FTPReplyData(code: 200, message: '');
     }
@@ -547,41 +661,135 @@ class _RawFtpSession {
   }
 
   Future<FTPReplyData> _readReply() async {
-    final buffer = <int>[];
-    await Future.doWhile(() async {
-      var dataReceivedSuccessfully = false;
-      while (_socket!.available() > 0) {
-        buffer.addAll(_socket!.read()!);
-        dataReceivedSuccessfully = true;
-      }
-      if (dataReceivedSuccessfully) return false;
-      await Future.delayed(const Duration(milliseconds: 150));
-      return true;
-    }).timeout(Duration(seconds: timeoutSeconds));
+    final pendingError = _pendingControlError;
+    if (pendingError != null) {
+      _pendingControlError = null;
+      throw pendingError;
+    }
 
-    final message = HotftpRawFtpClient.decodeBytes(buffer).trim();
-    final lines = message
-        .replaceAll('\r', '')
-        .split('\n')
-        .where((line) => line.isNotEmpty)
-        .toList();
-    if (lines.isEmpty) {
-      throw const FormatException('Empty FTP reply');
+    if (_receivedReplies.isNotEmpty) {
+      return _receivedReplies.removeFirst();
     }
-    final last = lines.last;
-    final code = int.tryParse(last.substring(0, 3));
-    if (code == null) {
-      throw FormatException('Invalid FTP reply: $message');
-    }
-    return FTPReplyData(code: code, message: message);
+
+    final completer = Completer<FTPReplyData>();
+    _waitingReplies.addLast(completer);
+    return completer.future.timeout(Duration(seconds: timeoutSeconds));
   }
 
   Future<List<int>> _readData(Socket dataSocket) async {
     final buffer = <int>[];
-    await dataSocket.listen((Uint8List chunk) {
+    await for (final chunk in dataSocket) {
       buffer.addAll(chunk);
-    }).asFuture<void>();
+    }
     return buffer;
+  }
+
+  void _startControlListener() {
+    _controlSubscription?.cancel();
+    _controlSubscription = _socket!.listen(
+      (chunk) {
+        _controlPendingLine += HotftpRawFtpClient.decodeBytes(chunk);
+        _drainControlLines();
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _failPendingReplies(error, stackTrace);
+      },
+      onDone: () {
+        _failPendingReplies(
+          StateError('FTP control connection closed'),
+          StackTrace.current,
+        );
+      },
+      cancelOnError: true,
+    );
+  }
+
+  void _drainControlLines() {
+    final normalized = _controlPendingLine.replaceAll('\r', '');
+    final lines = normalized.split('\n');
+    if (lines.isEmpty) return;
+
+    final hasTrailingPartial = !normalized.endsWith('\n');
+    final completeLines = hasTrailingPartial ? lines.sublist(0, lines.length - 1) : lines;
+    _controlPendingLine = hasTrailingPartial ? lines.last : '';
+
+    for (final rawLine in completeLines) {
+      final line = rawLine.trimRight();
+      if (line.isEmpty) continue;
+      _consumeControlLine(line);
+    }
+  }
+
+  void _consumeControlLine(String line) {
+    if (_controlReplyLines.isEmpty) {
+      if (line.length < 3) {
+        _queueControlReplyError(FormatException('Invalid FTP reply: $line'));
+        return;
+      }
+      final code = int.tryParse(line.substring(0, 3));
+      if (code == null) {
+        _queueControlReplyError(FormatException('Invalid FTP reply: $line'));
+        return;
+      }
+      _controlReplyCode = code.toString();
+      _controlReplyLines.add(line);
+      if (line.length >= 4 && line[3] == ' ') {
+        _completeControlReply();
+      }
+      return;
+    }
+
+    _controlReplyLines.add(line);
+    final code = _controlReplyCode;
+    if (code != null && line.length >= 4 && line.startsWith(code) && line[3] == ' ') {
+      _completeControlReply();
+    }
+  }
+
+  void _completeControlReply() {
+    final first = _controlReplyLines.first;
+    final code = int.tryParse(first.substring(0, 3));
+    if (code == null) {
+      _queueControlReplyError(FormatException('Invalid FTP reply: $first'));
+      return;
+    }
+
+    final message = _controlReplyLines.join('\n');
+    final reply = FTPReplyData(code: code, message: message);
+    _controlReplyLines.clear();
+    _controlReplyCode = null;
+    _deliverReply(reply);
+  }
+
+  void _deliverReply(FTPReplyData reply) {
+    _pendingControlError = null;
+    if (_waitingReplies.isNotEmpty) {
+      _waitingReplies.removeFirst().complete(reply);
+      return;
+    }
+    _receivedReplies.addLast(reply);
+  }
+
+  void _queueControlReplyError(Object error) {
+    final replyError = error is FormatException
+        ? error
+        : FormatException('Invalid FTP reply: $error');
+    while (_waitingReplies.isNotEmpty) {
+      _waitingReplies.removeFirst().completeError(replyError);
+    }
+    _controlReplyLines.clear();
+    _controlReplyCode = null;
+    _receivedReplies.clear();
+    _pendingControlError = replyError;
+  }
+
+  void _failPendingReplies(Object error, StackTrace stackTrace) {
+    while (_waitingReplies.isNotEmpty) {
+      _waitingReplies.removeFirst().completeError(error, stackTrace);
+    }
+    if (_receivedReplies.isEmpty) {
+      _pendingControlError = error;
+    }
   }
 
   static Map<String, dynamic>? _parseMlsdLine(String line) {
