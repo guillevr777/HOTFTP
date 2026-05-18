@@ -80,6 +80,7 @@ class BrowserViewModel extends ChangeNotifier {
   RemoteTypeFilter typeFilter = RemoteTypeFilter.all;
   RemoteFileViewMode displayMode = RemoteFileViewMode.grid;
   RemoteGridDensity gridDensity = RemoteGridDensity.medium;
+  bool _disposed = false;
 
   List<RemoteFile> get visibleRemoteFiles {
     final cached = _visibleRemoteFilesCache;
@@ -163,17 +164,17 @@ class BrowserViewModel extends ChangeNotifier {
       _invalidateVisibleRemoteFilesCache();
       error = null;
       isLoading = false;
-      notifyListeners();
+      _notifyIfActive();
       unawaited(_refreshRemoteFiles(p));
       return;
     }
 
     isLoading = true;
     error = null;
-    notifyListeners();
+    _notifyIfActive();
     await _refreshRemoteFiles(p);
     isLoading = false;
-    notifyListeners();
+    _notifyIfActive();
   }
 
   void resetFilters() {
@@ -248,12 +249,12 @@ class BrowserViewModel extends ChangeNotifier {
       _invalidateVisibleRemoteFilesCache();
       // Keep the first paint fast; sync metadata in the background.
       unawaited(_trackFileVersions());
-      notifyListeners();
+      _notifyIfActive();
     } catch (e) {
       remoteFiles = [];
       error = "Error al listar archivos: $e";
       debugPrint('HOTFTP: loadRemoteFiles failed for $path -> $e');
-      notifyListeners();
+      _notifyIfActive();
     }
   }
 
@@ -264,11 +265,11 @@ class BrowserViewModel extends ChangeNotifier {
     }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
       try {
-        final latest = await getLatestFileVersion.execute(
-          ownerId,
-          profile.id!,
-          file.path,
-        );
+      final latest = await getLatestFileVersion.execute(
+        ownerId,
+        profile.id!,
+        file.path,
+      );
         final modifiedAt = file.modifiedAt;
         final hasChanged =
             latest == null ||
@@ -383,7 +384,7 @@ class BrowserViewModel extends ChangeNotifier {
 
   void invalidateThumbnail(String filePath) {
     if (thumbnails.remove(filePath) != null) {
-      notifyListeners();
+      _notifyIfActive();
     }
   }
 
@@ -410,7 +411,7 @@ class BrowserViewModel extends ChangeNotifier {
         profile,
       );
       thumbnails[request.file.path] = localPath;
-      notifyListeners();
+      _notifyIfActive();
     } catch (e) {
       debugPrint("Error cargando miniatura para ${request.file.name}: $e");
     } finally {
@@ -434,6 +435,17 @@ class BrowserViewModel extends ChangeNotifier {
 
   void _invalidateVisibleRemoteFilesCache() {
     _visibleRemoteFilesCache = null;
+  }
+
+  void _notifyIfActive() {
+    if (_disposed) return;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

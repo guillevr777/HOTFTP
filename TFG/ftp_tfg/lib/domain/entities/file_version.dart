@@ -24,16 +24,16 @@
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
     'ownerId': ownerId,
     'profileId': profileId,
     'filePath': filePath,
     'fileName': fileName,
     'versionNumber': versionNumber,
     'size': size,
-    'modifiedAt': modifiedAt?.toIso8601String(),
     'source': source,
     'createdAt': createdAt.toIso8601String(),
+    if (id != null) 'id': id,
+    if (modifiedAt != null) 'modifiedAt': modifiedAt!.toIso8601String(),
   };
 
   factory FileVersion.fromMap(Map<String, dynamic> map) => FileVersion(

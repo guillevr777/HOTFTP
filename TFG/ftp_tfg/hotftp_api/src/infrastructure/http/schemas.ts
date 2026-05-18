@@ -83,14 +83,23 @@ export const alertSchema = z.object({
 });
 
 export const fileVersionSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.preprocess(
+    (value) => value === null || value === undefined || value === '' ? undefined : value,
+    z.coerce.number().int().positive().optional(),
+  ),
   ownerId: z.string().min(1),
   profileId: z.coerce.number().int().positive(),
   filePath: z.string().min(1),
   fileName: z.string().min(1),
   versionNumber: z.coerce.number().int().positive(),
   size: z.coerce.number().int().nonnegative(),
-  modifiedAt: z.string().datetime().optional(),
+  modifiedAt: z.preprocess(
+    (value) => value === null || value === undefined || value === '' ? undefined : value,
+    z.string().datetime().optional(),
+  ),
   source: z.string().min(1),
-  createdAt: z.string().datetime().default(() => new Date().toISOString()),
+  createdAt: z.preprocess(
+    (value) => value === null || value === undefined || value === '' ? undefined : value,
+    z.string().datetime().default(() => new Date().toISOString()),
+  ),
 });

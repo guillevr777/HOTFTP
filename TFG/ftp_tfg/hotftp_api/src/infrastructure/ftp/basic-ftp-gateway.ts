@@ -25,16 +25,8 @@ export class BasicFtpGateway implements FtpGateway {
     const client = new Client();
     client.ftp.verbose = false;
 
-    const config: FtpConnectionConfig = {
-      host: profile.host || this.fallbackConfig.host,
-      port: profile.port || this.fallbackConfig.port,
-      user: profile.username || this.fallbackConfig.user,
-      password: profile.password || this.fallbackConfig.password,
-      secure: profile.protocol === 'ftps' || this.fallbackConfig.secure,
-    };
-
     try {
-      await client.access(config);
+      await client.access(this.toConfig(profile));
       const entries = await client.list(path || '/');
       return entries.map((entry) => ({
         name: entry.name,
