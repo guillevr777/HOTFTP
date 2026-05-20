@@ -106,8 +106,9 @@ class _LocalBrowserFilePreviewScreenState extends State<LocalBrowserFilePreviewS
     } catch (_) {
       _problem = 'No se pudo abrir este archivo.';
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -165,7 +166,7 @@ class _ImageView extends StatelessWidget {
         child: Image.file(
           File(path),
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Padding(
+          errorBuilder: (context, error, stackTrace) => const Padding(
             padding: EdgeInsets.all(24),
             child: Text(
               'No se pudo mostrar esta imagen.',

@@ -367,6 +367,7 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
           return LocalBrowserFileGridTile(
             key: ValueKey(file.path),
             file: file,
+            onLongPress: () => _showLocalDetails(context, file),
             onTap: () async {
               if (file.isDirectory) {
                 await vm.navigateLocal(file);

@@ -145,16 +145,16 @@ class DumpTransferService {
       final localDirPath = p.join(localRoot, dir);
       final remoteDirPath = p.posix.join(remoteRoot, dir);
       if (localDirs.contains(dir) && !remoteDirs.contains(dir)) {
-        if (await _ensureLocalDirectory(localDirPath)) {
-          directoriesCreated++;
-        }
-      }
-      if (remoteDirs.contains(dir) && !localDirs.contains(dir)) {
         if (await _ensureRemoteDirectory(
           remoteDirPath,
           profile,
           remoteDirs,
         )) {
+          directoriesCreated++;
+        }
+      }
+      if (remoteDirs.contains(dir) && !localDirs.contains(dir)) {
+        if (await _ensureLocalDirectory(localDirPath)) {
           directoriesCreated++;
         }
       }

@@ -120,6 +120,33 @@ void main() {
     expect(repo.downloadedFiles, contains('/sync/remote-only/cloud.txt'));
     expect(File(p.join(tempDir.path, 'remote-only', 'cloud.txt')).existsSync(), isTrue);
   });
+
+  test('bidirectional mirrors empty directories to the missing side', () async {
+    final tempDir = await Directory.systemTemp.createTemp('hotftp-sync-bidir-dirs-');
+    addTearDown(() => tempDir.delete(recursive: true));
+
+    await Directory(p.join(tempDir.path, 'local-empty')).create(recursive: true);
+
+    final repo = _InMemoryTreeRepository();
+    repo.seedRemoteDirectory('/sync');
+    repo.seedRemoteDirectory('/sync/remote-empty');
+
+    final service = DumpTransferService(repo);
+    final profile = _profile();
+
+    final result = await service.execute(
+      profile: profile,
+      localPath: tempDir.path,
+      remotePath: '/sync',
+      transferMode: DumpTransferMode.syncBoth,
+      sourceSide: DumpSourceSide.local,
+      deleteSourceAfterCopy: false,
+    );
+
+    expect(result.directoriesCreated, 2);
+    expect(repo.createdDirectories, contains('/sync/local-empty'));
+    expect(Directory(p.join(tempDir.path, 'remote-empty')).existsSync(), isTrue);
+  });
 }
 
 FtpProfile _profile() {

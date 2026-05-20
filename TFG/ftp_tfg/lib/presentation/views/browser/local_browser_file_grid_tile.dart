@@ -7,11 +7,13 @@ import '../../../utils/file_utils.dart';
 class LocalBrowserFileGridTile extends StatelessWidget {
   final LocalFile file;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const LocalBrowserFileGridTile({
     super.key,
     required this.file,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -23,6 +25,7 @@ class LocalBrowserFileGridTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: Column(
