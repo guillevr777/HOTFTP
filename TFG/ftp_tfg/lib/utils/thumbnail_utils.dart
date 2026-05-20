@@ -1,8 +1,9 @@
 import 'dart:ui' as ui;
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 class ThumbnailUtils {
   ThumbnailUtils._();
@@ -91,6 +92,56 @@ class ThumbnailUtils {
       size: maxDimension,
     );
     return outFile.path;
+  }
+
+  static Future<String> buildVideoThumbnailFromFile({
+    required String sourcePath,
+    required String thumbnailPath,
+    int maxDimension = 160,
+    int timeMs = 1,
+  }) async {
+    final sourceFile = File(sourcePath);
+    final exists = await sourceFile.exists();
+    if (!exists) {
+      return buildVideoPlaceholderThumbnail(thumbnailPath: thumbnailPath);
+    }
+
+    try {
+      if (await sourceFile.length() == 0) {
+        return buildVideoPlaceholderThumbnail(thumbnailPath: thumbnailPath);
+      }
+    } catch (_) {
+      return buildVideoPlaceholderThumbnail(thumbnailPath: thumbnailPath);
+    }
+
+    final outFile = File(thumbnailPath);
+    await outFile.parent.create(recursive: true);
+
+    if (_canGenerateNativeVideoThumbnail()) {
+      try {
+        final bytes = await VideoThumbnail.thumbnailData(
+          video: sourcePath,
+          imageFormat: ImageFormat.PNG,
+          maxWidth: maxDimension,
+          timeMs: timeMs,
+          quality: 85,
+        );
+        if (bytes != null && bytes.isNotEmpty) {
+          await outFile.writeAsBytes(bytes, flush: true);
+          return outFile.path;
+        }
+      } catch (_) {
+        // Fall back to a stable placeholder when native decoding fails.
+      }
+    }
+
+    return buildVideoPlaceholderThumbnail(thumbnailPath: thumbnailPath);
+  }
+
+  static bool _canGenerateNativeVideoThumbnail() {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
   }
 
   static Future<String> buildVideoPlaceholderThumbnail({
@@ -189,3 +240,8 @@ class ThumbnailUtils {
     await outFile.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
   }
 }
+
+
+
+
+

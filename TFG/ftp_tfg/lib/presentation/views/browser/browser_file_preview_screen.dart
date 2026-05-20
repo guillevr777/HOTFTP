@@ -9,6 +9,8 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:universal_io/io.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../utils/thumbnail_utils.dart';
+
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
 import '../../../theme/app_theme.dart';
@@ -37,6 +39,7 @@ class BrowserFilePreviewScreen extends StatefulWidget {
 class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
   late final _PreviewKind _previewKind;
   String? _previewPath;
+  String? _previewPosterPath;
   String? _textPreviewContent;
   bool _previewLoading = true;
 
@@ -181,7 +184,10 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
 
     return switch (_previewKind) {
       _PreviewKind.image => _ImagePreviewViewport(filePath: previewPath),
-      _PreviewKind.video => _VideoPreviewViewport(filePath: previewPath),
+      _PreviewKind.video => _VideoPreviewViewport(
+        filePath: previewPath,
+        posterPath: _previewPosterPath,
+      ),
       _PreviewKind.pdf => SafeArea(child: SfPdfViewer.file(File(previewPath))),
       _PreviewKind.text => _TextPreviewViewport(
         fileName: widget.file.name,
@@ -334,7 +340,14 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
     final sourcePath = p.join(sourceDir.path, widget.file.name);
     final sourceFile = File(sourcePath);
     if (await sourceFile.exists()) {
-      return sourcePath;
+      try {
+        if (widget.file.size <= 0 || await sourceFile.length() == widget.file.size) {
+          return sourcePath;
+        }
+      } catch (_) {
+        await sourceFile.delete().catchError((_) => sourceFile);
+      }
+      await sourceFile.delete().catchError((_) => sourceFile);
     }
 
     await widget.downloadFileUseCase
@@ -355,8 +368,22 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
     try {
       final previewPath = await _loadPreviewFile();
       String? textPreview;
+      String? posterPath;
       if (_previewKind == _PreviewKind.text && previewPath != null) {
         textPreview = await _readTextPreview(previewPath);
+      } else if (_previewKind == _PreviewKind.video && previewPath != null) {
+        final posterFileName = '${p.basenameWithoutExtension(previewPath)}.poster.png';
+        posterPath = p.join(p.dirname(previewPath), posterFileName);
+        try {
+          posterPath = await ThumbnailUtils.buildVideoThumbnailFromFile(
+            sourcePath: previewPath,
+            thumbnailPath: posterPath,
+            maxDimension: 720,
+            timeMs: 1,
+          );
+        } catch (_) {
+          posterPath = null;
+        }
       }
       if (!mounted) return;
       setState(() {
@@ -364,6 +391,7 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
           _textPreviewContent = textPreview;
         } else {
           _previewPath = previewPath;
+          _previewPosterPath = posterPath;
         }
         _previewLoading = false;
       });
@@ -531,8 +559,9 @@ class _ImagePreviewViewport extends StatelessWidget {
 
 class _VideoPreviewViewport extends StatefulWidget {
   final String filePath;
+  final String? posterPath;
 
-  const _VideoPreviewViewport({required this.filePath});
+  const _VideoPreviewViewport({required this.filePath, this.posterPath});
 
   @override
   State<_VideoPreviewViewport> createState() => _VideoPreviewViewportState();
@@ -615,6 +644,7 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
     if (!_hasStarted || controller == null) {
       return _VideoPreviewPoster(
         fileName: widget.filePath.split(Platform.pathSeparator).last,
+        posterPath: widget.posterPath,
         isPreparing: _isPreparing,
         onPlayPressed: _startPlayback,
       );
@@ -762,11 +792,13 @@ class _VideoPreviewFallback extends StatelessWidget {
 
 class _VideoPreviewPoster extends StatelessWidget {
   final String fileName;
+  final String? posterPath;
   final bool isPreparing;
   final VoidCallback onPlayPressed;
 
   const _VideoPreviewPoster({
     required this.fileName,
+    required this.posterPath,
     required this.isPreparing,
     required this.onPlayPressed,
   });
@@ -797,36 +829,62 @@ class _VideoPreviewPoster extends StatelessWidget {
                                 color: Colors.white.withValues(alpha: 0.16),
                               ),
                             ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.movie_outlined,
-                                  color: Colors.white54,
-                                  size: 88,
-                                ),
-                                Positioned(
-                                  bottom: 16,
-                                  child: FilledButton.icon(
-                                    onPressed: isPreparing
-                                        ? null
-                                        : onPlayPressed,
-                                    icon: isPreparing
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Icon(Icons.play_arrow),
-                                    label: Text(
-                                      isPreparing ? 'Preparando' : 'Reproducir',
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                alignment: Alignment.center,
+                                children: [
+                                  if (posterPath != null && File(posterPath!).existsSync())
+                                    Image.file(
+                                      File(posterPath!),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const ColoredBox(color: Colors.black);
+                                      },
+                                    )
+                                  else
+                                    const ColoredBox(color: Colors.black),
+                                  Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Color(0x22000000),
+                                          Color(0xAA000000),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const Center(
+                                    child: Icon(
+                                      Icons.movie_outlined,
+                                      color: Colors.white54,
+                                      size: 88,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 16,
+                                    child: FilledButton.icon(
+                                      onPressed: isPreparing ? null : onPlayPressed,
+                                      icon: isPreparing
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(Icons.play_arrow),
+                                      label: Text(
+                                        isPreparing ? 'Preparando' : 'Reproducir',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -959,3 +1017,7 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+
+
+

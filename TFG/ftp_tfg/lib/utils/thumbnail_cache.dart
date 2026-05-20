@@ -8,7 +8,7 @@ import 'package:universal_io/io.dart';
 class ThumbnailCache {
   ThumbnailCache._();
 
-  static const int cacheVersion = 6;
+  static const int cacheVersion = 7;
 
   static Future<Directory> resolveDirectory() async {
     final supportDir = await getApplicationSupportDirectory();
@@ -41,3 +41,4 @@ class ThumbnailCache {
     return sha1.convert(utf8.encode(payload)).toString();
   }
 }
+

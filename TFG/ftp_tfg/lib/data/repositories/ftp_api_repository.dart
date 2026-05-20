@@ -212,8 +212,11 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     );
     try {
       if (FileUtils.isVideo(file.name)) {
-        return ThumbnailUtils.buildVideoPlaceholderThumbnail(
+        return ThumbnailUtils.buildVideoThumbnailFromFile(
+          sourcePath: sourcePath,
           thumbnailPath: thumbnailPath,
+          maxDimension: 240,
+          timeMs: 1,
         );
       }
 
@@ -323,3 +326,6 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     return savedSchedule.id ?? schedule.id ?? 0;
   }
 }
+
+
+

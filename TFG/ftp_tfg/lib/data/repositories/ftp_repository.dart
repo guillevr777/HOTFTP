@@ -184,8 +184,11 @@ class FtpRepositoryImpl implements FtpRepository {
     );
     try {
       if (FileUtils.isVideo(file.name)) {
-        return ThumbnailUtils.buildVideoPlaceholderThumbnail(
+        return ThumbnailUtils.buildVideoThumbnailFromFile(
+          sourcePath: sourcePath,
           thumbnailPath: thumbnailPath,
+          maxDimension: 240,
+          timeMs: 1,
         );
       }
 
@@ -279,3 +282,6 @@ class FtpRepositoryImpl implements FtpRepository {
   Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
       _db.saveDumpSchedule(schedule);
 }
+
+
+

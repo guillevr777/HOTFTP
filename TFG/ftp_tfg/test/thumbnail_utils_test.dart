@@ -39,8 +39,33 @@ void main() {
       }
     });
 
+    final source = File('${tempDir.path}/source.mp4');
     final target = File('${tempDir.path}/thumbs/video.png');
-    final result = await ThumbnailUtils.buildVideoPlaceholderThumbnail(
+    await source.writeAsBytes([0, 1, 2, 3, 4]);
+
+    final result = await ThumbnailUtils.buildVideoThumbnailFromFile(
+      sourcePath: source.path,
+      thumbnailPath: target.path,
+    );
+
+    expect(result, target.path);
+    expect(await target.exists(), isTrue);
+    expect(await target.length(), greaterThan(0));
+  });
+
+  test('falls back to a placeholder when the video source is missing', () async {
+    final tempDir = await Directory.systemTemp.createTemp('video-thumb-missing-');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final source = File('${tempDir.path}/missing.mp4');
+    final target = File('${tempDir.path}/thumbs/missing.png');
+
+    final result = await ThumbnailUtils.buildVideoThumbnailFromFile(
+      sourcePath: source.path,
       thumbnailPath: target.path,
     );
 
@@ -122,3 +147,8 @@ void main() {
     expect(base, isNot(equals(changedSize)));
   });
 }
+
+
+
+
+
