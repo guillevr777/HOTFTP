@@ -159,16 +159,37 @@ class _SyncBody extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             if (vm.isSyncing) ...[
-              const LinearProgressIndicator(color: AppTheme.primary),
-              const SizedBox(height: 12),
-              const Text(
-                'Sincronizando...',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.onSurfaceMuted),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: vm.syncProgress == 0 ? null : vm.syncProgress,
+                  minHeight: 10,
+                  color: AppTheme.primary,
+                  backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
+                ),
               ),
+              const SizedBox(height: 12),
+              Text(
+                vm.syncStatus,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppTheme.onSurfaceMuted),
+              ),
+              if (vm.currentItemPath != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  vm.currentItemPath!,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
-                'Transferidos: ${vm.filesTransferred}  |  Omitidos: ${vm.filesSkipped}',
+                vm.syncSummaryText,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppTheme.primary,
@@ -204,7 +225,7 @@ class _SyncBody extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${vm.filesTransferred} archivos transferidos, ${vm.filesSkipped} omitidos',
+                      '${vm.filesTransferred} archivos transferidos, ${vm.directoriesCreated} carpetas creadas, ${vm.filesSkipped} omitidos',
                       style: const TextStyle(
                         color: AppTheme.onSurfaceMuted,
                         fontSize: 13,

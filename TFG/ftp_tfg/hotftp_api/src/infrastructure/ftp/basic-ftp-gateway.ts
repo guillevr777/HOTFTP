@@ -32,7 +32,7 @@ export class BasicFtpGateway implements FtpGateway {
         name: entry.name,
         path: path ? `${path.replace(/\/$/, '')}/${entry.name}` : `/${entry.name}`,
         size: entry.size ?? 0,
-        isDirectory: entry.isDirectory,
+        isDirectory: this.isDirectoryEntry(entry),
         modifiedAt: entry.modifiedAt?.toISOString(),
       }));
     } finally {
@@ -55,6 +55,24 @@ export class BasicFtpGateway implements FtpGateway {
       await client.access(this.toConfig(profile));
       await client.cd(remotePath || '/');
       await client.uploadFrom(createReadStream(localFilePath), localFilePath.split(/[\\/]/).pop() ?? 'upload.bin');
+    } finally {
+      client.close();
+    }
+  }
+
+  async createRemoteDirectory(
+    remotePath: string,
+    profile: FtpProfile,
+  ): Promise<void> {
+    if (profile.protocol === 'sftp') {
+      return this.createRemoteDirectorySftp(remotePath, profile);
+    }
+
+    const client = new Client();
+    client.ftp.verbose = false;
+    try {
+      await client.access(this.toConfig(profile));
+      await client.ensureDir(remotePath || '/');
     } finally {
       client.close();
     }
@@ -196,6 +214,27 @@ export class BasicFtpGateway implements FtpGateway {
     }
   }
 
+  private async createRemoteDirectorySftp(
+    remotePath: string,
+    profile: FtpProfile,
+  ): Promise<void> {
+    const client = new SftpClient();
+    try {
+      await client.connect(this.toSftpConfig(profile));
+      const normalized = remotePath || '/';
+      if (normalized === '/') return;
+      try {
+        await (client as any).mkdir(normalized, true);
+      } catch (error: any) {
+        const message = `${error?.message ?? error}`.toLowerCase();
+        if (!message.includes('file exists') && !message.includes('already exists')) {
+          throw error;
+        }
+      }
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
   private async downloadFileToPathSftp(
     remoteFileName: string,
     remoteDirectory: string,
@@ -232,6 +271,13 @@ export class BasicFtpGateway implements FtpGateway {
     return normalizedDirectory === '/' ? `/${name}` : `${normalizedDirectory}/${name}`;
   }
 
+  private isDirectoryEntry(entry: any) {
+    return entry?.isDirectory === true ||
+      entry?.type === 'd' ||
+      entry?.type === 'directory' ||
+      entry?.rawType === 'd';
+  }
+
   private toDateString(value: unknown): string | undefined {
     if (value instanceof Date) {
       return value.toISOString();
@@ -250,3 +296,6 @@ export class BasicFtpGateway implements FtpGateway {
     return undefined;
   }
 }
+
+
+

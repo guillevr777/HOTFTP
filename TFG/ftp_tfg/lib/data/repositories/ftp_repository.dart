@@ -13,6 +13,7 @@ import '../interfaces/ftp_datasource.dart';
 import '../local/database_helper.dart';
 import '../mappers/remote_file_mapper.dart';
 import '../../utils/file_utils.dart';
+import '../../utils/local_download_manifest_store.dart';
 import '../../utils/thumbnail_cache.dart';
 import '../../utils/thumbnail_utils.dart';
 
@@ -85,17 +86,23 @@ class FtpRepositoryImpl implements FtpRepository {
     if (kIsWeb) return Future.value([]);
     final dir = Directory(path);
     if (!dir.existsSync()) return Future.value([]);
+    final entries = dir
+        .listSync(followLinks: false)
+        .whereType<FileSystemEntity>();
     return Future.value(
-      dir.listSync().whereType<File>().map((file) {
-        final stat = file.statSync();
-        final fileName = file.uri.pathSegments.last;
+      entries.map((entry) {
+        final stat = entry.statSync();
+        final fileName = p.basename(entry.path);
+        final isDirectory = entry is Directory;
         return LocalFile(
           name: fileName,
-          path: file.path,
-          size: stat.size,
-          isDirectory: false,
+          path: entry.path,
+          size: isDirectory ? 0 : stat.size,
+          isDirectory: isDirectory,
           lastModified: stat.modified,
-          extension: p.extension(file.path).replaceFirst('.', '').toLowerCase(),
+          extension: isDirectory
+              ? ''
+              : p.extension(entry.path).replaceFirst('.', '').toLowerCase(),
         );
       }).toList(),
     );
@@ -111,11 +118,17 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
+  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile) {
+    return datasource.createRemoteDirectory(remotePath, _getConfig(profile));
+  }
+
+  @override
   Future<void> downloadFile(
     RemoteFile file,
     String localPath,
-    FtpProfile profile,
-  ) {
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  }) {
     final remoteDirectory = p.dirname(file.path);
     final targetPath = '$localPath/${file.name}';
     return datasource.downloadFileToPath(
@@ -123,6 +136,8 @@ class FtpRepositoryImpl implements FtpRepository {
       remoteDirectory == '.' ? '/' : remoteDirectory,
       targetPath,
       _getConfig(profile),
+      onProgress: onProgress,
+      expectedSize: file.size,
     );
   }
 
@@ -137,13 +152,13 @@ class FtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<void> deleteLocalFile(String path) {
-    if (kIsWeb) return Future.value();
+  Future<void> deleteLocalFile(String path) async {
+    if (kIsWeb) return;
+    await LocalDownloadManifestStore.delete(path);
     final file = File(path);
     if (file.existsSync()) {
-      return file.delete();
+      await file.delete();
     }
-    return Future.value();
   }
 
   @override
@@ -282,6 +297,3 @@ class FtpRepositoryImpl implements FtpRepository {
   Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
       _db.saveDumpSchedule(schedule);
 }
-
-
-

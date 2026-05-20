@@ -1,4 +1,4 @@
-import 'package:provider/provider.dart';
+﻿import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../domain/interfaces/i_acknowledge_alert_use_case.dart';
@@ -16,6 +16,7 @@ import '../../domain/interfaces/i_get_dump_schedule_for_profile_use_case.dart';
 import '../../domain/interfaces/i_get_file_version_history_use_case.dart';
 import '../../domain/interfaces/i_get_health_summary_use_case.dart';
 import '../../domain/interfaces/i_get_latest_file_version_use_case.dart';
+import '../../domain/interfaces/i_get_local_file_details_use_case.dart';
 import '../../domain/interfaces/i_get_local_files_use_case.dart';
 import '../../domain/interfaces/i_get_profiles_use_case.dart';
 import '../../domain/interfaces/i_get_recent_events_use_case.dart';
@@ -109,6 +110,7 @@ class AppUseCases {
   final ISaveDumpScheduleUseCase saveDumpSchedule;
   final IGetFileVersionHistoryUseCase getFileVersionHistory;
   final IGetLatestFileVersionUseCase getLatestFileVersion;
+  final IGetLocalFileDetailsUseCase getLocalFileDetails;
   final IRecordFileVersionUseCase recordFileVersion;
   final IGetHealthSummaryUseCase getHealthSummary;
   final IGetRecentEventsUseCase getRecentEvents;
@@ -149,6 +151,7 @@ class AppUseCases {
     required this.saveDumpSchedule,
     required this.getFileVersionHistory,
     required this.getLatestFileVersion,
+    required this.getLocalFileDetails,
     required this.recordFileVersion,
     required this.getHealthSummary,
     required this.getRecentEvents,
@@ -196,6 +199,7 @@ AppUseCases createUseCases(AppRepositories repositories) {
     saveDumpSchedule: SaveDumpSchedule(ftpRepository),
     getFileVersionHistory: GetFileVersionHistory(monitoringRepository),
     getLatestFileVersion: GetLatestFileVersion(monitoringRepository),
+    getLocalFileDetails: GetLocalFileDetails(ftpRepository),
     recordFileVersion: RecordFileVersion(monitoringRepository),
     getHealthSummary: GetHealthSummary(monitoringRepository),
     getRecentEvents: GetRecentEvents(monitoringRepository),
@@ -216,19 +220,27 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<ILogoutUserUseCase>.value(value: useCases.logoutUser),
     Provider<IRestoreSessionUseCase>.value(value: useCases.restoreSession),
     Provider<IObserveAuthStateUseCase>.value(value: useCases.observeAuthState),
-    Provider<ILinkEmailPasswordUseCase>.value(value: useCases.linkEmailPassword),
+    Provider<ILinkEmailPasswordUseCase>.value(
+      value: useCases.linkEmailPassword,
+    ),
     Provider<IRequestPasswordResetUseCase>.value(
       value: useCases.requestPasswordReset,
     ),
-    Provider<IUpdateDisplayNameUseCase>.value(value: useCases.updateDisplayName),
-    Provider<IEvaluateSyncRulesUseCase>.value(value: useCases.evaluateSyncRules),
+    Provider<IUpdateDisplayNameUseCase>.value(
+      value: useCases.updateDisplayName,
+    ),
+    Provider<IEvaluateSyncRulesUseCase>.value(
+      value: useCases.evaluateSyncRules,
+    ),
     Provider<IBuildSystemHealthReportUseCase>.value(
       value: useCases.buildSystemHealthReport,
     ),
     Provider<IGenerateSystemRecommendationsUseCase>.value(
       value: useCases.generateSystemRecommendations,
     ),
-    Provider<IAnalyzeSystemUsageUseCase>.value(value: useCases.analyzeSystemUsage),
+    Provider<IAnalyzeSystemUsageUseCase>.value(
+      value: useCases.analyzeSystemUsage,
+    ),
     Provider<IGetProfilesUseCase>.value(value: useCases.getProfiles),
     Provider<ISaveProfileUseCase>.value(value: useCases.saveProfile),
     Provider<IDeleteProfileUseCase>.value(value: useCases.deleteProfile),
@@ -237,7 +249,9 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<IGetLocalFilesUseCase>.value(value: useCases.getLocalFiles),
     Provider<IUploadFileUseCase>.value(value: useCases.uploadFile),
     Provider<IDownloadFileUseCase>.value(value: useCases.downloadFile),
-    Provider<IDownloadThumbnailUseCase>.value(value: useCases.downloadThumbnail),
+    Provider<IDownloadThumbnailUseCase>.value(
+      value: useCases.downloadThumbnail,
+    ),
     Provider<IDetectConflictsUseCase>.value(value: useCases.detectConflicts),
     Provider<IGetSyncHistoryUseCase>.value(value: useCases.getSyncHistory),
     Provider<ISaveSyncRecordUseCase>.value(value: useCases.saveSyncRecord),
@@ -251,7 +265,12 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<IGetLatestFileVersionUseCase>.value(
       value: useCases.getLatestFileVersion,
     ),
-    Provider<IRecordFileVersionUseCase>.value(value: useCases.recordFileVersion),
+    Provider<IGetLocalFileDetailsUseCase>.value(
+      value: useCases.getLocalFileDetails,
+    ),
+    Provider<IRecordFileVersionUseCase>.value(
+      value: useCases.recordFileVersion,
+    ),
     Provider<IGetHealthSummaryUseCase>.value(value: useCases.getHealthSummary),
     Provider<IGetRecentEventsUseCase>.value(value: useCases.getRecentEvents),
     Provider<IGetActiveAlertsUseCase>.value(value: useCases.getActiveAlerts),
@@ -264,3 +283,5 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<ICreateAlertUseCase>.value(value: useCases.createAlert),
   ];
 }
+
+

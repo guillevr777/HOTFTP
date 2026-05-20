@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -98,15 +98,39 @@ class HotftpApiClient {
     _ensureSuccess(response);
   }
 
+  Future<void> createRemoteDirectory({
+    required String ownerId,
+    required int profileId,
+    required String remotePath,
+  }) async {
+    final response = await http.post(
+      _uri('/api/v1/files/directory'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'ownerId': ownerId,
+        'profileId': profileId,
+        'remotePath': remotePath,
+      }),
+    );
+    _ensureSuccess(response, expectedStatusCodes: {200, 201});
+  }
+
   Future<void> downloadFileToPath({
     required String ownerId,
     required int profileId,
     required String remotePath,
     required String fileName,
     required String targetLocalPath,
+    void Function(double progress)? onProgress,
+    int? expectedSize,
   }) async {
-    final file = File(targetLocalPath);
-    await file.parent.create(recursive: true);
+    final targetFile = File(targetLocalPath);
+    final tempFile = File('$targetLocalPath.part');
+    await targetFile.parent.create(recursive: true);
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+
     final request = http.Request(
       'GET',
       _uri('/api/v1/files/download', {
@@ -122,12 +146,43 @@ class HotftpApiClient {
       _ensureSuccess(response);
     }
 
-    final sink = file.openWrite(mode: FileMode.writeOnly);
+    final sink = tempFile.openWrite(mode: FileMode.writeOnly);
+    var received = 0;
+    final total = (streamed.contentLength ?? -1) > 0
+        ? streamed.contentLength!
+        : (expectedSize != null && expectedSize > 0 ? expectedSize : -1);
+    var completed = false;
     try {
-      await streamed.stream.pipe(sink);
+      await for (final chunk in streamed.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (onProgress != null && total > 0) {
+          onProgress((received / total).clamp(0.0, 1.0).toDouble());
+        }
+      }
+
+      if (total > 0 && received != total) {
+        throw FileSystemException(
+          'Incomplete download',
+          targetLocalPath,
+        );
+      }
+
+      if (onProgress != null) {
+        onProgress(1.0);
+      }
+      completed = true;
     } finally {
       await sink.close();
+      if (!completed && await tempFile.exists()) {
+        await tempFile.delete();
+      }
     }
+
+    if (await targetFile.exists()) {
+      await targetFile.delete();
+    }
+    await tempFile.rename(targetLocalPath);
   }
 
   Future<void> deleteRemoteFile({
@@ -346,3 +401,12 @@ class HotftpApiClient {
     return expectedStatusCodes.contains(statusCode);
   }
 }
+
+
+
+
+
+
+
+
+

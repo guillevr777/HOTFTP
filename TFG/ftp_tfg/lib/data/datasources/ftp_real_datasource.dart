@@ -18,8 +18,7 @@ class FtpRealDatasource implements FtpDatasource {
       return raw.name.toLowerCase() == 'sftp';
     }
     final normalized = '${raw ?? ''}'.trim().toLowerCase();
-    return normalized == 'sftp' ||
-        normalized.endsWith('.sftp');
+    return normalized == 'sftp' || normalized.endsWith('.sftp');
   }
 
   @override
@@ -59,16 +58,29 @@ class FtpRealDatasource implements FtpDatasource {
           : _client.uploadFile(localFilePath, remotePath, config);
 
   @override
+  Future<void> createRemoteDirectory(
+    String remotePath,
+    Map<String, dynamic> config,
+  ) =>
+      _usesSftp(config)
+          ? _sftpClient.createRemoteDirectory(remotePath, config)
+          : _client.createRemoteDirectory(remotePath, config);
+
+  @override
   Future<void> downloadFile(
     String remoteFileName,
     String localPath,
-    Map<String, dynamic> config,
-  ) {
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) {
     return downloadFileToPath(
       remoteFileName,
-      "/",
-      "$localPath/$remoteFileName",
+      '/',
+      '$localPath/$remoteFileName',
       config,
+      onProgress: onProgress,
+      expectedSize: expectedSize,
     );
   }
 
@@ -77,20 +89,26 @@ class FtpRealDatasource implements FtpDatasource {
     String remoteFileName,
     String remoteDirectory,
     String targetLocalPath,
-    Map<String, dynamic> config,
-  ) =>
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) =>
       _usesSftp(config)
           ? _sftpClient.downloadFileToPath(
               remoteFileName,
               remoteDirectory,
               targetLocalPath,
               config,
+              onProgress: onProgress,
+              expectedSize: expectedSize,
             )
           : _client.downloadFileToPath(
               remoteFileName,
               remoteDirectory,
               targetLocalPath,
               config,
+              onProgress: onProgress,
+              expectedSize: expectedSize,
             );
 
   @override
@@ -107,3 +125,4 @@ class FtpRealDatasource implements FtpDatasource {
             )
           : _client.deleteRemoteFile(remoteFileName, remoteDirectory, config);
 }
+

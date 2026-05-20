@@ -41,11 +41,22 @@ class HybridFtpRepositoryImpl implements FtpRepository {
   ) => _repositoryFor(profile).uploadFile(localPath, remotePath, profile);
 
   @override
+  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile) =>
+      _repositoryFor(profile).createRemoteDirectory(remotePath, profile);
+
+  @override
   Future<void> downloadFile(
     RemoteFile file,
     String localPath,
-    FtpProfile profile,
-  ) => _repositoryFor(profile).downloadFile(file, localPath, profile);
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  }) =>
+      _repositoryFor(profile).downloadFile(
+        file,
+        localPath,
+        profile,
+        onProgress: onProgress,
+      );
 
   @override
   Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile) =>
@@ -113,3 +124,4 @@ class HybridFtpRepositoryImpl implements FtpRepository {
   Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
       remoteRepository.saveDumpSchedule(schedule, profile);
 }
+

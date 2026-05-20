@@ -56,6 +56,11 @@ class SyncViewModel extends ChangeNotifier {
   bool isDone = false;
   int filesTransferred = 0;
   int filesSkipped = 0;
+  int directoriesCreated = 0;
+  int processedItems = 0;
+  int totalItems = 0;
+  String syncStatus = 'Preparando sincronización...';
+  String? currentItemPath;
   String? error;
   List<SyncConflict> conflicts = [];
   List<SyncRecord> history = [];
@@ -88,6 +93,11 @@ class SyncViewModel extends ChangeNotifier {
     isDone = false;
     filesTransferred = 0;
     filesSkipped = 0;
+    directoriesCreated = 0;
+    processedItems = 0;
+    totalItems = 0;
+    currentItemPath = null;
+    syncStatus = 'Preparando sincronización...';
     error = null;
     conflicts = [];
     notifyListeners();
@@ -114,9 +124,23 @@ class SyncViewModel extends ChangeNotifier {
         transferMode: transferMode,
         sourceSide: sourceSide,
         deleteSourceAfterCopy: false,
+        onProgress: (progress) {
+          processedItems = progress.processed;
+          totalItems = progress.total;
+          filesTransferred = progress.transferred;
+          filesSkipped = progress.skipped;
+          directoriesCreated = progress.directoriesCreated;
+          currentItemPath = progress.currentPath;
+          syncStatus = _statusFor(progress);
+          notifyListeners();
+        },
       );
       filesTransferred = result.transferred;
       filesSkipped = result.skipped;
+      directoriesCreated = result.directoriesCreated;
+      processedItems = totalItems == 0 ? processedItems : totalItems;
+      currentItemPath = null;
+      syncStatus = 'Sincronización completada';
       await _saveSyncRecord.execute(
         SyncRecord(
           ownerId: ownerId,
@@ -136,7 +160,7 @@ class SyncViewModel extends ChangeNotifier {
         severity: SystemEventSeverity.success,
         title: 'SincronizaciÃ³n completada',
         message:
-            'Se han transferido $filesTransferred archivos y se han omitido $filesSkipped.',
+            'Se han transferido $filesTransferred archivos, se han creado $directoriesCreated carpetas y se han omitido $filesSkipped elementos.',
       );
       isDone = true;
     } catch (e) {
@@ -157,6 +181,40 @@ class SyncViewModel extends ChangeNotifier {
     }
     isSyncing = false;
     notifyListeners();
+  }
+
+  double get syncProgress {
+    if (totalItems <= 0) return 0;
+    return (processedItems / totalItems).clamp(0.0, 1.0);
+  }
+
+  String get syncSummaryText {
+    return 'Transferidos: $filesTransferred  |  Carpetas: $directoriesCreated  |  Omitidos: $filesSkipped';
+  }
+
+  String _statusFor(DumpTransferProgress progress) {
+    final path = progress.currentPath ?? '';
+    final label = _shortenPath(path);
+    switch (progress.stage) {
+      case 'creating_remote_directory':
+      case 'creating_local_directory':
+        return 'Creando carpeta $label';
+      case 'uploading':
+        return 'Subiendo $label';
+      case 'downloading':
+        return 'Descargando $label';
+      case 'skipping':
+        return 'Omitiendo $label';
+      case 'syncing_directory':
+        return 'Revisando carpeta $label';
+      default:
+        return 'Preparando sincronización...';
+    }
+  }
+
+  String _shortenPath(String path) {
+    if (path.length <= 72) return path;
+    return '...${path.substring(path.length - 69)}';
   }
 
   Future<void> loadHistory() async {

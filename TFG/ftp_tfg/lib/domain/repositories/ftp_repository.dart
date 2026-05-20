@@ -1,4 +1,4 @@
-﻿import '../entities/ftp_profile.dart';
+import '../entities/ftp_profile.dart';
 import '../entities/dump_schedule.dart';
 import '../entities/local_file.dart';
 import '../entities/remote_file.dart';
@@ -14,11 +14,13 @@ abstract class FtpRepository {
     String remotePath,
     FtpProfile profile,
   );
+  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile);
   Future<void> downloadFile(
     RemoteFile file,
     String localPath,
-    FtpProfile profile,
-  );
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  });
   Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile);
   Future<void> deleteLocalFile(String path);
   Future<String> downloadThumbnail(
@@ -43,6 +45,4 @@ abstract class FtpRepository {
   );
   Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile);
 }
-
-
 

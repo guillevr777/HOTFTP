@@ -10,6 +10,7 @@ import '../../domain/entities/sync_conflict.dart';
 import '../../domain/entities/sync_record.dart';
 import '../../domain/repositories/ftp_repository.dart';
 import '../../utils/file_utils.dart';
+import '../../utils/local_download_manifest_store.dart';
 import '../../utils/thumbnail_cache.dart';
 import '../mappers/remote_file_mapper.dart';
 import '../datasources/hotftp_api_client.dart';
@@ -104,17 +105,23 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     if (kIsWeb) return Future.value([]);
     final dir = Directory(path);
     if (!dir.existsSync()) return Future.value([]);
+    final entries = dir
+        .listSync(followLinks: false)
+        .whereType<FileSystemEntity>();
     return Future.value(
-      dir.listSync().whereType<File>().map((file) {
-        final stat = file.statSync();
-        final fileName = file.uri.pathSegments.last;
+      entries.map((entry) {
+        final stat = entry.statSync();
+        final fileName = p.basename(entry.path);
+        final isDirectory = entry is Directory;
         return LocalFile(
           name: fileName,
-          path: file.path,
-          size: stat.size,
-          isDirectory: false,
+          path: entry.path,
+          size: isDirectory ? 0 : stat.size,
+          isDirectory: isDirectory,
           lastModified: stat.modified,
-          extension: p.extension(file.path).replaceFirst('.', '').toLowerCase(),
+          extension: isDirectory
+              ? ''
+              : p.extension(entry.path).replaceFirst('.', '').toLowerCase(),
         );
       }).toList(),
     );
@@ -135,11 +142,21 @@ class ApiFtpRepositoryImpl implements FtpRepository {
   }
 
   @override
+  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile) {
+    return client.createRemoteDirectory(
+      ownerId: _ownerIdFor(profile),
+      profileId: profile.id ?? 0,
+      remotePath: _normalizeRemotePath(remotePath),
+    );
+  }
+
+  @override
   Future<void> downloadFile(
     RemoteFile file,
     String localPath,
-    FtpProfile profile,
-  ) {
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  }) {
     final remoteDirectory = p.dirname(file.path);
     final targetPath = '$localPath/${file.name}';
     return client.downloadFileToPath(
@@ -148,6 +165,8 @@ class ApiFtpRepositoryImpl implements FtpRepository {
       remotePath: remoteDirectory == '.' ? '/' : remoteDirectory,
       fileName: file.name,
       targetLocalPath: targetPath,
+      onProgress: onProgress,
+      expectedSize: file.size,
     );
   }
 
@@ -163,13 +182,13 @@ class ApiFtpRepositoryImpl implements FtpRepository {
   }
 
   @override
-  Future<void> deleteLocalFile(String path) {
-    if (kIsWeb) return Future.value();
+  Future<void> deleteLocalFile(String path) async {
+    if (kIsWeb) return;
+    await LocalDownloadManifestStore.delete(path);
     final file = File(path);
     if (file.existsSync()) {
-      return file.delete();
+      await file.delete();
     }
-    return Future.value();
   }
 
   @override
@@ -209,6 +228,7 @@ class ApiFtpRepositoryImpl implements FtpRepository {
       remotePath: remoteDirectory == '.' ? '/' : remoteDirectory,
       fileName: file.name,
       targetLocalPath: sourcePath,
+      expectedSize: file.size,
     );
     try {
       if (FileUtils.isVideo(file.name)) {
@@ -326,6 +346,3 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     return savedSchedule.id ?? schedule.id ?? 0;
   }
 }
-
-
-

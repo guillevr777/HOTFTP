@@ -28,11 +28,19 @@ class _SlowDatasource implements FtpDatasource {
   ) => throw UnimplementedError();
 
   @override
+  Future<void> createRemoteDirectory(
+    String remotePath,
+    Map<String, dynamic> config,
+  ) => throw UnimplementedError();
+
+  @override
   Future<void> downloadFile(
     String remoteFileName,
     String localPath,
-    Map<String, dynamic> config,
-  ) => throw UnimplementedError();
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) => throw UnimplementedError();
 
   @override
   Future<void> deleteRemoteFile(
@@ -46,8 +54,10 @@ class _SlowDatasource implements FtpDatasource {
     String remoteFileName,
     String remoteDirectory,
     String targetLocalPath,
-    Map<String, dynamic> config,
-  ) => throw UnimplementedError();
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) => throw UnimplementedError();
 }
 
 void main() {
@@ -68,3 +78,6 @@ void main() {
     expect(stopwatch.elapsed.inSeconds, lessThan(4));
   });
 }
+
+
+

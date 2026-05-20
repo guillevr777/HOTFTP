@@ -8,6 +8,10 @@ export interface FtpGateway {
     remotePath: string,
     profile: FtpProfile,
   ): Promise<void>;
+  createRemoteDirectory(
+    remotePath: string,
+    profile: FtpProfile,
+  ): Promise<void>;
   downloadFileToPath(
     remoteFileName: string,
     remoteDirectory: string,
@@ -21,4 +25,5 @@ export interface FtpGateway {
   ): Promise<void>;
   testConnection(profile: FtpProfile): Promise<boolean>;
 }
+
 

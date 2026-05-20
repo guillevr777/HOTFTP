@@ -90,6 +90,23 @@ export function createRouter(deps: AppDependencies) {
   );
 
   router.post(
+    '/files/directory',
+    asyncHandler(async (req, res) => {
+      const ownerId = String(req.body.ownerId ?? '');
+      const profileId = Number(req.body.profileId ?? '');
+      const remotePath = String(req.body.remotePath ?? '/');
+      if (!ownerId || Number.isNaN(profileId)) {
+        throw new HttpError(400, 'ownerId y profileId son obligatorios', 'validation_error');
+      }
+      const profile = await deps.profileRepository.findById(ownerId, profileId);
+      if (!profile) {
+        throw new HttpError(404, 'Perfil FTP no encontrado', 'profile_not_found');
+      }
+      await deps.ftpGateway.createRemoteDirectory(remotePath, profile);
+      res.status(201).json({ ok: true });
+    }),
+  );
+  router.post(
     '/files/upload',
     upload.single('file'),
     asyncHandler(async (req, res) => {
@@ -423,3 +440,4 @@ export function createRouter(deps: AppDependencies) {
 
   return router;
 }
+

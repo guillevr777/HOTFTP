@@ -1,4 +1,4 @@
-﻿abstract class FtpDatasource {
+abstract class FtpDatasource {
   Future<List<Map<String, dynamic>>> listRemoteFiles(
     String path,
     Map<String, dynamic> config,
@@ -9,11 +9,17 @@
     String remotePath,
     Map<String, dynamic> config,
   );
+  Future<void> createRemoteDirectory(
+    String remotePath,
+    Map<String, dynamic> config,
+  );
   Future<void> downloadFile(
     String remoteFileName,
     String localPath,
-    Map<String, dynamic> config,
-  );
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  });
   Future<void> deleteRemoteFile(
     String remoteFileName,
     String remoteDirectory,
@@ -23,8 +29,10 @@
     String remoteFileName,
     String remoteDirectory,
     String targetLocalPath,
-    Map<String, dynamic> config,
-  );
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  });
   Future<bool> testConnection(Map<String, dynamic> profile);
 }
 

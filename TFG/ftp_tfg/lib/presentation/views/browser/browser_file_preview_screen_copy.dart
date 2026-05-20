@@ -37,8 +37,6 @@ class BrowserFilePreviewScreen extends StatefulWidget {
 }
 
 class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
-  static const Duration _previewDownloadTimeout = Duration(minutes: 5);
-
   late final _PreviewKind _previewKind;
   String? _previewPath;
   String? _previewPosterPath;
@@ -414,7 +412,7 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
 
     await widget.downloadFileUseCase
         .execute(widget.file, sourceDir.path, widget.profile)
-        .timeout(_previewDownloadTimeout);
+        .timeout(const Duration(seconds: 30));
 
     return sourcePath;
   }
@@ -635,7 +633,7 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
   bool _controlsVisible = true;
   bool _isPreparing = false;
   bool _hasStarted = false;
-  String? _initErrorMessage;
+  Object? _initError;
 
   @override
   void initState() {
@@ -652,7 +650,7 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
     if (_isPreparing || _hasStarted) return;
     setState(() {
       _isPreparing = true;
-      _initErrorMessage = null;
+      _initError = null;
     });
 
     final controller = VideoPlayerController.file(File(widget.filePath));
@@ -675,7 +673,7 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
       _initFuture = null;
       if (!mounted) return;
       setState(() {
-        _initErrorMessage = _describePlaybackError(error);
+        _initError = error;
         _isPreparing = false;
       });
     }
@@ -696,10 +694,9 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
 
   @override
   Widget build(BuildContext context) {
-    if (_initErrorMessage != null) {
+    if (_initError != null) {
       return _VideoPreviewFallback(
         fileName: widget.filePath.split(Platform.pathSeparator).last,
-        message: _initErrorMessage!,
       );
     }
 
@@ -813,12 +810,8 @@ class _VideoPreviewViewportState extends State<_VideoPreviewViewport> {
 
 class _VideoPreviewFallback extends StatelessWidget {
   final String fileName;
-  final String message;
 
-  const _VideoPreviewFallback({
-    required this.fileName,
-    required this.message,
-  });
+  const _VideoPreviewFallback({required this.fileName});
 
   @override
   Widget build(BuildContext context) {
@@ -844,16 +837,10 @@ class _VideoPreviewFallback extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
               const Text(
-                'Si el archivo llegó completo y sigue sin abrir, lo más probable es que el códec no sea compatible con el reproductor del dispositivo.',
+                'No se pudo abrir la reproduccion de este video en el dispositivo. Puedes descargarlo para verlo con otra app.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54),
+                style: TextStyle(color: Colors.white70),
               ),
             ],
           ),
@@ -861,21 +848,6 @@ class _VideoPreviewFallback extends StatelessWidget {
       ),
     );
   }
-}
-
-String _describePlaybackError(Object error) {
-  final raw = error.toString();
-  final lower = raw.toLowerCase();
-  if (lower.contains('timeout')) {
-    return 'La vista previa tardó demasiado en descargarse. Puede ser una conexión lenta o un vídeo grande.';
-  }
-  if (lower.contains('format') ||
-      lower.contains('codec') ||
-      lower.contains('mediacodec') ||
-      lower.contains('unsupported')) {
-    return 'El archivo se descargó, pero el reproductor del dispositivo no entiende este códec o contenedor.';
-  }
-  return 'La reproducción falló al preparar el vídeo. Detalle técnico: $raw';
 }
 
 class _VideoPreviewPoster extends StatelessWidget {

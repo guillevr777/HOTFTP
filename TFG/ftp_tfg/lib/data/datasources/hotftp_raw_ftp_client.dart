@@ -99,16 +99,39 @@ class HotftpRawFtpClient {
     }
   }
 
-  Future<void> downloadFileToPath(
-    String remoteFileName,
-    String remoteDirectory,
-    String targetLocalPath,
+  Future<void> createRemoteDirectory(
+    String remotePath,
     Map<String, dynamic> config,
   ) async {
     final session = await _openSession(config);
     try {
+      await session.createFolderIfNotExist(remotePath);
+      await session.disconnect();
+    } catch (e) {
+      try {
+        await session.disconnect();
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  Future<void> downloadFileToPath(
+    String remoteFileName,
+    String remoteDirectory,
+    String targetLocalPath,
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) async {
+    final session = await _openSession(config);
+    try {
       await session.changeDirectory(remoteDirectory);
-      await session.downloadFile(remoteFileName, targetLocalPath);
+      await session.downloadFile(
+        remoteFileName,
+        targetLocalPath,
+        onProgress: onProgress,
+        expectedSize: expectedSize,
+      );
       await session.disconnect();
     } catch (e) {
       try {
@@ -476,8 +499,10 @@ class _RawFtpSession {
 
   Future<void> downloadFile(
     String remoteFileName,
-    String targetLocalPath,
-  ) async {
+    String targetLocalPath, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) async {
     _ensureReady();
 
     final transfer = await _openDataTransferChannel('RETR $remoteFileName');
@@ -487,20 +512,57 @@ class _RawFtpSession {
       throw FormatException('Connection refused for download');
     }
 
-    final sink = File(targetLocalPath).openWrite(mode: FileMode.writeOnly);
-    await dataSocket.listen((Uint8List chunk) {
-      sink.add(chunk);
-    }).asFuture<void>();
-    await dataSocket.close();
-    await sink.flush();
-    await sink.close();
+    final targetFile = File(targetLocalPath);
+    final tempFile = File('$targetLocalPath.part');
+    await targetFile.parent.create(recursive: true);
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+
+    final sink = tempFile.openWrite(mode: FileMode.writeOnly);
+    var received = 0;
+    final total = expectedSize != null && expectedSize > 0 ? expectedSize : -1;
+    var completed = false;
+    try {
+      await for (final chunk in dataSocket) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (onProgress != null && total > 0) {
+          onProgress((received / total).clamp(0.0, 1.0));
+        }
+      }
+
+      if (total > 0 && received != total) {
+        throw FileSystemException('Incomplete download', targetLocalPath);
+      }
+
+      if (onProgress != null) {
+        onProgress(1.0);
+      }
+      completed = true;
+    } finally {
+      await dataSocket.close();
+      await sink.flush();
+      await sink.close();
+      if (!completed && await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    }
 
     if (!firstReply.isSuccess) {
       final completion = await _readReply();
       if (!completion.isSuccess) {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
         throw FormatException('Download failed');
       }
     }
+
+    if (await targetFile.exists()) {
+      await targetFile.delete();
+    }
+    await tempFile.rename(targetLocalPath);
   }
 
   Future<void> deleteFile(String remoteFileName) async {
@@ -891,3 +953,7 @@ class FTPReplyData {
   bool get isSuccess => code >= 200 && code < 400;
   bool get isPreliminary => code == 125 || code == 150;
 }
+
+
+
+

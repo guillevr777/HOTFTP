@@ -13,7 +13,7 @@ class RemoteFileMapper {
       name: name,
       path: path,
       size: map['size'] as int? ?? 0,
-      isDirectory: map['isDir'] == true,
+      isDirectory: map['isDir'] == true || map['isDirectory'] == true,
       modifiedAt: modifiedAt,
     );
   }

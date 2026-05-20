@@ -126,11 +126,16 @@ class _StubFtpRepository implements FtpRepository {
   ) async => throw UnimplementedError();
 
   @override
+  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile) async =>
+      throw UnimplementedError();
+
+  @override
   Future<void> downloadFile(
     RemoteFile file,
     String localPath,
-    FtpProfile profile,
-  ) async => throw UnimplementedError();
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  }) async => throw UnimplementedError();
 
   @override
   Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile) async =>
@@ -177,3 +182,6 @@ class _StubFtpRepository implements FtpRepository {
     FtpProfile profile,
   ) async => throw UnimplementedError();
 }
+
+
+

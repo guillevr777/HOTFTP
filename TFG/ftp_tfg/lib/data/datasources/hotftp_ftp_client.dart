@@ -22,17 +22,28 @@ class HotftpFtpClient {
     return _rawClient.uploadFile(localFilePath, remotePath, config);
   }
 
+  Future<void> createRemoteDirectory(
+    String remotePath,
+    Map<String, dynamic> config,
+  ) async {
+    return _rawClient.createRemoteDirectory(remotePath, config);
+  }
+
   Future<void> downloadFileToPath(
     String remoteFileName,
     String remoteDirectory,
     String targetLocalPath,
-    Map<String, dynamic> config,
-  ) async {
+    Map<String, dynamic> config, {
+    void Function(double progress)? onProgress,
+    int? expectedSize,
+  }) async {
     return _rawClient.downloadFileToPath(
       remoteFileName,
       remoteDirectory,
       targetLocalPath,
       config,
+      onProgress: onProgress,
+      expectedSize: expectedSize,
     );
   }
 
@@ -44,3 +55,4 @@ class HotftpFtpClient {
     return _rawClient.deleteRemoteFile(remoteFileName, remoteDirectory, config);
   }
 }
+
