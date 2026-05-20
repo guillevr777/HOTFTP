@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
+import 'package:path/path.dart' as p;
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -64,12 +66,12 @@ class DumpScheduleViewModel extends ChangeNotifier {
   }
 
   void setLocalPath(String value) {
-    localPath = value;
+    localPath = value.trim();
     notifyListeners();
   }
 
   void setRemotePath(String value) {
-    remotePath = value;
+    remotePath = _normalizeRemotePath(value);
     notifyListeners();
   }
 
@@ -98,6 +100,31 @@ class DumpScheduleViewModel extends ChangeNotifier {
   void setIntervalUnit(DumpIntervalUnit value) {
     intervalUnit = value;
     notifyListeners();
+  }
+
+  void copyFromManual({
+    required String manualLocalPath,
+    required String manualRemotePath,
+    required DumpSourceSide manualSourceSide,
+    required DumpTransferMode manualTransferMode,
+  }) {
+    localPath = manualLocalPath.trim().isEmpty
+        ? '/storage/emulated/0/Download'
+        : manualLocalPath.trim();
+    remotePath = _normalizeRemotePath(manualRemotePath);
+    sourceSide = manualSourceSide;
+    transferMode = manualTransferMode;
+    enabled = true;
+    notifyListeners();
+  }
+
+  String _normalizeRemotePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == '/') return '/';
+    final normalized = p.posix.normalize(
+      trimmed.startsWith('/') ? trimmed : '/$trimmed',
+    );
+    return normalized == '.' || normalized.isEmpty ? '/' : normalized;
   }
 
   Future<void> saveSchedule() async {
@@ -162,7 +189,3 @@ class DumpScheduleViewModel extends ChangeNotifier {
     notifyListeners();
   }
 }
-
-
-
-

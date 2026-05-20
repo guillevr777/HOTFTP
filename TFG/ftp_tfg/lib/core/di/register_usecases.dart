@@ -1,11 +1,13 @@
-﻿import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../domain/interfaces/i_acknowledge_alert_use_case.dart';
 import '../../domain/interfaces/i_analyze_system_usage_use_case.dart';
 import '../../domain/interfaces/i_build_system_health_report_use_case.dart';
 import '../../domain/interfaces/i_create_alert_use_case.dart';
+import '../../domain/interfaces/i_delete_local_file_use_case.dart';
 import '../../domain/interfaces/i_delete_profile_use_case.dart';
+import '../../domain/interfaces/i_delete_remote_file_use_case.dart';
 import '../../domain/interfaces/i_detect_conflicts_use_case.dart';
 import '../../domain/interfaces/i_download_file_use_case.dart';
 import '../../domain/interfaces/i_download_thumbnail_use_case.dart';
@@ -44,7 +46,9 @@ import '../../domain/usecases/acknowledge_alert.dart';
 import '../../domain/usecases/analyze_system_usage.dart';
 import '../../domain/usecases/build_system_health_report.dart';
 import '../../domain/usecases/create_alert.dart';
+import '../../domain/usecases/delete_local_file.dart';
 import '../../domain/usecases/delete_profile.dart';
+import '../../domain/usecases/delete_remote_file.dart';
 import '../../domain/usecases/detect_conflicts.dart';
 import '../../domain/usecases/download_file.dart';
 import '../../domain/usecases/download_thumbnail.dart';
@@ -97,6 +101,8 @@ class AppUseCases {
   final IGetProfilesUseCase getProfiles;
   final ISaveProfileUseCase saveProfile;
   final IDeleteProfileUseCase deleteProfile;
+  final IDeleteRemoteFileUseCase deleteRemoteFile;
+  final IDeleteLocalFileUseCase deleteLocalFile;
   final ITestConnectionUseCase testConnection;
   final IGetRemoteFilesUseCase getRemoteFiles;
   final IGetLocalFilesUseCase getLocalFiles;
@@ -138,6 +144,8 @@ class AppUseCases {
     required this.getProfiles,
     required this.saveProfile,
     required this.deleteProfile,
+    required this.deleteRemoteFile,
+    required this.deleteLocalFile,
     required this.testConnection,
     required this.getRemoteFiles,
     required this.getLocalFiles,
@@ -186,6 +194,8 @@ AppUseCases createUseCases(AppRepositories repositories) {
     getProfiles: GetProfiles(ftpRepository),
     saveProfile: SaveProfile(ftpRepository),
     deleteProfile: DeleteProfile(ftpRepository),
+    deleteRemoteFile: DeleteRemoteFile(ftpRepository),
+    deleteLocalFile: DeleteLocalFile(ftpRepository),
     testConnection: TestConnection(ftpRepository),
     getRemoteFiles: GetRemoteFiles(ftpRepository),
     getLocalFiles: GetLocalFiles(ftpRepository),
@@ -244,6 +254,8 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<IGetProfilesUseCase>.value(value: useCases.getProfiles),
     Provider<ISaveProfileUseCase>.value(value: useCases.saveProfile),
     Provider<IDeleteProfileUseCase>.value(value: useCases.deleteProfile),
+    Provider<IDeleteRemoteFileUseCase>.value(value: useCases.deleteRemoteFile),
+    Provider<IDeleteLocalFileUseCase>.value(value: useCases.deleteLocalFile),
     Provider<ITestConnectionUseCase>.value(value: useCases.testConnection),
     Provider<IGetRemoteFilesUseCase>.value(value: useCases.getRemoteFiles),
     Provider<IGetLocalFilesUseCase>.value(value: useCases.getLocalFiles),
@@ -283,5 +295,3 @@ List<SingleChildWidget> createUseCaseProviders(AppUseCases useCases) {
     Provider<ICreateAlertUseCase>.value(value: useCases.createAlert),
   ];
 }
-
-

@@ -1,10 +1,12 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/local_file.dart';
 import '../../../domain/entities/remote_file.dart';
+import '../../../domain/interfaces/i_delete_local_file_use_case.dart';
+import '../../../domain/interfaces/i_delete_remote_file_use_case.dart';
 import '../../../domain/interfaces/i_download_file_use_case.dart';
 import '../../../domain/interfaces/i_download_thumbnail_use_case.dart';
 import '../../../domain/interfaces/i_get_latest_file_version_use_case.dart';
@@ -36,20 +38,25 @@ class RemoteBrowserScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => BrowserViewModel(
-        getRemoteFiles: context.read<IGetRemoteFilesUseCase>(),
-        getLocalFiles: context.read<IGetLocalFilesUseCase>(),
-        getLocalFileDetails: context.read<IGetLocalFileDetailsUseCase>(),
-        downloadFileUseCase: context.read<IDownloadFileUseCase>(),
-        uploadFileUseCase: context.read<IUploadFileUseCase>(),
-        downloadThumbnailUseCase: context.read<IDownloadThumbnailUseCase>(),
-        getLatestFileVersion: context.read<IGetLatestFileVersionUseCase>(),
-        recordFileVersion: context.read<IRecordFileVersionUseCase>(),
-        profile: profile,
-        ownerId: ownerId,
-      )
-        ..resetFilters()
-        ..loadRemoteFiles(),
+      create: (context) =>
+          BrowserViewModel(
+              getRemoteFiles: context.read<IGetRemoteFilesUseCase>(),
+              getLocalFiles: context.read<IGetLocalFilesUseCase>(),
+              getLocalFileDetails: context.read<IGetLocalFileDetailsUseCase>(),
+              downloadFileUseCase: context.read<IDownloadFileUseCase>(),
+              uploadFileUseCase: context.read<IUploadFileUseCase>(),
+              downloadThumbnailUseCase: context
+                  .read<IDownloadThumbnailUseCase>(),
+              deleteRemoteFileUseCase: context.read<IDeleteRemoteFileUseCase>(),
+              deleteLocalFileUseCase: context.read<IDeleteLocalFileUseCase>(),
+              getLatestFileVersion: context
+                  .read<IGetLatestFileVersionUseCase>(),
+              recordFileVersion: context.read<IRecordFileVersionUseCase>(),
+              profile: profile,
+              ownerId: ownerId,
+            )
+            ..resetFilters()
+            ..loadRemoteFiles(),
       child: _RemoteBrowserBody(profile: profile, ownerId: ownerId),
     );
   }
@@ -125,9 +132,9 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           context.read<BrowserViewModel>().prioritizeVisibleThumbnails(
-                vm.displayedRemoteFiles,
-                vm.currentRemotePath,
-              );
+            vm.displayedRemoteFiles,
+            vm.currentRemotePath,
+          );
         });
       }
     }
@@ -135,11 +142,22 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
+        leading: vm.isSelectionMode
+            ? IconButton(
+                tooltip: 'Cancelar seleccion',
+                icon: const Icon(Icons.close),
+                onPressed: vm.clearSelection,
+              )
+            : null,
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.profile.name),
+            Text(
+              vm.isSelectionMode
+                  ? '${vm.selectedCount} seleccionado${vm.selectedCount == 1 ? '' : 's'}'
+                  : widget.profile.name,
+            ),
             Text(
               vm.currentPath,
               style: const TextStyle(
@@ -150,32 +168,48 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sincronizar',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SyncScreen(
-                  profile: widget.profile,
-                  ownerId: widget.ownerId,
+          if (vm.isSelectionMode) ...[
+            IconButton(
+              icon: vm.isDeleting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              tooltip: 'Eliminar seleccionados',
+              onPressed: vm.isDeleting
+                  ? null
+                  : () => _deleteSelected(context, vm),
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sincronizar',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SyncScreen(
+                    profile: widget.profile,
+                    ownerId: widget.ownerId,
+                  ),
                 ),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Historial',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HistoryScreen(
-                  profile: widget.profile,
-                  ownerId: widget.ownerId,
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: 'Historial',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HistoryScreen(
+                    profile: widget.profile,
+                    ownerId: widget.ownerId,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
       body: Column(
@@ -229,8 +263,16 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
             child: vm.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : vm.isRemoteDestination
-                    ? _buildRemoteContent(context, vm, displayedFiles.cast<RemoteFile>())
-                    : _buildLocalContent(context, vm, displayedFiles.cast<LocalFile>()),
+                ? _buildRemoteContent(
+                    context,
+                    vm,
+                    displayedFiles.cast<RemoteFile>(),
+                  )
+                : _buildLocalContent(
+                    context,
+                    vm,
+                    displayedFiles.cast<LocalFile>(),
+                  ),
           ),
         ],
       ),
@@ -296,6 +338,10 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
             file: file,
             remotePath: vm.currentRemotePath,
             onTap: () async {
+              if (vm.isSelectionMode) {
+                vm.toggleRemoteSelection(file);
+                return;
+              }
               if (file.isDirectory) {
                 await vm.navigateRemote(file);
                 return;
@@ -303,7 +349,13 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
               if (!context.mounted) return;
               await _openPreview(context, vm, file);
             },
-            onDownload: file.isDirectory ? null : () => _download(context, vm, file),
+            onLongPress: file.isDirectory
+                ? null
+                : () => vm.toggleRemoteSelection(file),
+            isSelected: vm.isRemoteSelected(file),
+            onDownload: file.isDirectory
+                ? null
+                : () => _download(context, vm, file),
           );
         },
       ),
@@ -367,8 +419,15 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
           return LocalBrowserFileGridTile(
             key: ValueKey(file.path),
             file: file,
-            onLongPress: () => _showLocalDetails(context, file),
+            onLongPress: file.isDirectory
+                ? () => _showLocalDetails(context, file)
+                : () => vm.toggleLocalSelection(file),
+            isSelected: vm.isLocalSelected(file),
             onTap: () async {
+              if (vm.isSelectionMode) {
+                vm.toggleLocalSelection(file);
+                return;
+              }
               if (file.isDirectory) {
                 await vm.navigateLocal(file);
                 return;
@@ -378,9 +437,10 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => LocalBrowserFilePreviewScreen(
-          file: file,
-          onRepairRequested: (localFile) => vm.repairLocalFile(localFile),
-        ),
+                    file: file,
+                    onRepairRequested: (localFile) =>
+                        vm.repairLocalFile(localFile),
+                  ),
                 ),
               );
             },
@@ -422,7 +482,9 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
                 const SizedBox(height: 12),
                 _DetailRow(
                   label: 'Tamano',
-                  value: file.isDirectory ? 'Carpeta' : FileUtils.formatBytes(file.size),
+                  value: file.isDirectory
+                      ? 'Carpeta'
+                      : FileUtils.formatBytes(file.size),
                   icon: Icons.sd_storage_outlined,
                 ),
                 const SizedBox(height: 12),
@@ -457,10 +519,8 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
       MaterialPageRoute(
         builder: (_) => BrowserFilePreviewScreen(
           file: file,
-          onDownload: (onProgress) => vm.downloadFile(
-            file,
-            onProgress: onProgress,
-          ),
+          onDownload: (onProgress) =>
+              vm.downloadFile(file, onProgress: onProgress),
           profile: vm.profile,
           downloadFileUseCase: context.read<IDownloadFileUseCase>(),
         ),
@@ -478,7 +538,48 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          vm.error == null ? '"${file.name}" descargado correctamente' : vm.error!,
+          vm.error == null
+              ? '"${file.name}" descargado correctamente'
+              : vm.error!,
+        ),
+        backgroundColor: vm.error == null ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+
+  Future<void> _deleteSelected(
+    BuildContext context,
+    BrowserViewModel vm,
+  ) async {
+    final count = vm.selectedCount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Eliminar $count archivo${count == 1 ? '' : 's'}'),
+        content: const Text('Esta accion no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final deleted = await vm.deleteSelectedFiles();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          vm.error == null
+              ? '$deleted archivo${deleted == 1 ? '' : 's'} eliminado${deleted == 1 ? '' : 's'}'
+              : vm.error!,
         ),
         backgroundColor: vm.error == null ? AppTheme.success : AppTheme.error,
       ),
@@ -643,14 +744,12 @@ class _FilterBar extends StatelessWidget {
                       ? Icons.arrow_upward
                       : Icons.arrow_downward,
                 ),
-                label: Text(
-                  switch (vm.sortField) {
-                    RemoteSortField.name => 'Nombre',
-                    RemoteSortField.date => 'Fecha',
-                    RemoteSortField.size => 'Tamano',
-                    RemoteSortField.type => 'Tipo',
-                  },
-                ),
+                label: Text(switch (vm.sortField) {
+                  RemoteSortField.name => 'Nombre',
+                  RemoteSortField.date => 'Fecha',
+                  RemoteSortField.size => 'Tamano',
+                  RemoteSortField.type => 'Tipo',
+                }),
               ),
               const SizedBox(width: 12),
               DropdownButton<RemoteSortField>(
@@ -727,6 +826,3 @@ class _PathBar extends StatelessWidget {
     );
   }
 }
-
-
-

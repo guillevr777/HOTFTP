@@ -10,6 +10,8 @@ import '../../domain/entities/local_file.dart';
 import '../../domain/entities/remote_file.dart';
 import '../../domain/interfaces/i_download_file_use_case.dart';
 import '../../domain/interfaces/i_download_thumbnail_use_case.dart';
+import '../../domain/interfaces/i_delete_local_file_use_case.dart';
+import '../../domain/interfaces/i_delete_remote_file_use_case.dart';
 import '../../domain/interfaces/i_get_latest_file_version_use_case.dart';
 import '../../domain/interfaces/i_get_local_file_details_use_case.dart';
 import '../../domain/interfaces/i_get_local_files_use_case.dart';
@@ -54,6 +56,8 @@ class BrowserViewModel extends ChangeNotifier {
   final IDownloadFileUseCase downloadFileUseCase;
   final IUploadFileUseCase uploadFileUseCase;
   final IDownloadThumbnailUseCase downloadThumbnailUseCase;
+  final IDeleteRemoteFileUseCase deleteRemoteFileUseCase;
+  final IDeleteLocalFileUseCase deleteLocalFileUseCase;
   final IGetLatestFileVersionUseCase getLatestFileVersion;
   final IRecordFileVersionUseCase recordFileVersion;
   final FtpProfile profile;
@@ -69,6 +73,10 @@ class BrowserViewModel extends ChangeNotifier {
   double uploadProgress = 0;
   double downloadProgress = 0;
   bool isTransferring = false;
+  bool isSelectionMode = false;
+  bool isDeleting = false;
+  final Set<String> selectedRemotePaths = {};
+  final Set<String> selectedLocalPaths = {};
   Map<String, String> thumbnails = {};
   final Map<String, List<RemoteFile>> _remoteCache = {};
   final Map<String, List<LocalFile>> _localCache = {};
@@ -98,6 +106,8 @@ class BrowserViewModel extends ChangeNotifier {
     required this.downloadFileUseCase,
     required this.uploadFileUseCase,
     required this.downloadThumbnailUseCase,
+    required this.deleteRemoteFileUseCase,
+    required this.deleteLocalFileUseCase,
     required this.getLatestFileVersion,
     required this.recordFileVersion,
     required this.profile,
@@ -108,6 +118,9 @@ class BrowserViewModel extends ChangeNotifier {
   bool get isRemoteDestination => destination == BrowserDestination.remote;
   String get currentPath =>
       isLocalDestination ? currentLocalPath : currentRemotePath;
+  int get selectedCount => isLocalDestination
+      ? selectedLocalPaths.length
+      : selectedRemotePaths.length;
 
   List<RemoteFile> get visibleRemoteFiles {
     final cached = _visibleRemoteFilesCache;
@@ -252,6 +265,7 @@ class BrowserViewModel extends ChangeNotifier {
   Future<void> setDestination(BrowserDestination value) async {
     if (destination == value) return;
     destination = value;
+    clearSelection(notify: false);
     _resetVisibleRemoteFilesPagination();
     _resetVisibleLocalFilesPagination();
     _invalidateVisibleRemoteFilesCache();
@@ -271,6 +285,7 @@ class BrowserViewModel extends ChangeNotifier {
   }) async {
     final normalizedPath = _normalizeRemotePath(path ?? currentRemotePath);
     currentRemotePath = normalizedPath;
+    clearSelection(notify: false);
     _resetVisibleRemoteFilesPagination();
     final cached = _remoteCache[normalizedPath];
     if (cached != null && !forceRefresh) {
@@ -294,6 +309,7 @@ class BrowserViewModel extends ChangeNotifier {
   Future<void> loadLocalFiles({String? path, bool forceRefresh = false}) async {
     final normalizedPath = _normalizeLocalPath(path ?? currentLocalPath);
     currentLocalPath = normalizedPath;
+    clearSelection(notify: false);
     _resetVisibleLocalFilesPagination();
     final cached = _localCache[normalizedPath];
     if (cached != null && !forceRefresh) {
@@ -419,6 +435,78 @@ class BrowserViewModel extends ChangeNotifier {
     }
     isTransferring = false;
     notifyListeners();
+  }
+
+  bool isRemoteSelected(RemoteFile file) =>
+      selectedRemotePaths.contains(file.path);
+
+  bool isLocalSelected(LocalFile file) =>
+      selectedLocalPaths.contains(file.path);
+
+  void toggleRemoteSelection(RemoteFile file) {
+    if (file.isDirectory) return;
+    if (!selectedRemotePaths.add(file.path)) {
+      selectedRemotePaths.remove(file.path);
+    }
+    isSelectionMode = selectedCount > 0;
+    notifyListeners();
+  }
+
+  void toggleLocalSelection(LocalFile file) {
+    if (file.isDirectory) return;
+    if (!selectedLocalPaths.add(file.path)) {
+      selectedLocalPaths.remove(file.path);
+    }
+    isSelectionMode = selectedCount > 0;
+    notifyListeners();
+  }
+
+  void clearSelection({bool notify = true}) {
+    selectedRemotePaths.clear();
+    selectedLocalPaths.clear();
+    isSelectionMode = false;
+    if (notify) notifyListeners();
+  }
+
+  Future<int> deleteSelectedFiles() async {
+    if (selectedCount == 0 || isDeleting) return 0;
+    isDeleting = true;
+    error = null;
+    notifyListeners();
+    var deleted = 0;
+    try {
+      if (isRemoteDestination) {
+        final selected = selectedRemotePaths.toSet();
+        final files = remoteFiles
+            .where((file) => selected.contains(file.path) && !file.isDirectory)
+            .toList(growable: false);
+        for (final file in files) {
+          await deleteRemoteFileUseCase.execute(file, profile);
+          deleted++;
+        }
+        _remoteCache.remove(currentRemotePath);
+        clearSelection(notify: false);
+        await loadRemoteFiles(forceRefresh: true);
+      } else {
+        final selected = selectedLocalPaths.toSet();
+        final files = localFiles
+            .where((file) => selected.contains(file.path) && !file.isDirectory)
+            .toList(growable: false);
+        for (final file in files) {
+          await deleteLocalFileUseCase.execute(file.path);
+          deleted++;
+        }
+        _localCache.remove(currentLocalPath);
+        clearSelection(notify: false);
+        await loadLocalFiles(forceRefresh: true);
+      }
+    } catch (e) {
+      error = 'Error al eliminar: $e';
+    } finally {
+      isDeleting = false;
+      notifyListeners();
+    }
+    return deleted;
   }
 
   Future<void> navigateRemote(RemoteFile folder) async {
@@ -688,17 +776,16 @@ class BrowserViewModel extends ChangeNotifier {
       var freshFiles = await getLocalFileDetails.execute(path);
       if (currentLocalPath != path) return;
 
-      final candidates = freshFiles.where((file) {
-        if (file.isDirectory) return false;
-        return file.size == 0;
-      }).toList(growable: false);
+      final candidates = freshFiles
+          .where((file) {
+            if (file.isDirectory) return false;
+            return file.size == 0;
+          })
+          .toList(growable: false);
 
       var repairedAny = false;
       for (final file in candidates) {
-        final repaired = await repairLocalFile(
-          file,
-          refreshAfterRepair: false,
-        );
+        final repaired = await repairLocalFile(file, refreshAfterRepair: false);
         repairedAny = repairedAny || repaired;
       }
 

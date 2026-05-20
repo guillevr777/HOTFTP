@@ -13,14 +13,18 @@ class BrowserFileGridTile extends StatelessWidget {
   final RemoteFile file;
   final String remotePath;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final VoidCallback? onDownload;
+  final bool isSelected;
 
   const BrowserFileGridTile({
     super.key,
     required this.file,
     required this.remotePath,
     required this.onTap,
+    this.onLongPress,
     required this.onDownload,
+    this.isSelected = false,
   });
 
   @override
@@ -29,68 +33,104 @@ class BrowserFileGridTile extends StatelessWidget {
       color: AppTheme.surfaceVariant.withValues(alpha: 0.32),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _BrowserGridPreview(file: file, remotePath: remotePath),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                file.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Text(
-                      file.isDirectory
-                          ? 'Carpeta'
-                          : FileUtils.fileCategory(file.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.onSurfaceMuted,
-                      ),
+                    child: _BrowserGridPreview(
+                      file: file,
+                      remotePath: remotePath,
                     ),
                   ),
-                  if (!file.isDirectory) ...[
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Align(
-                        alignment: Alignment.centerRight,
+                  const SizedBox(height: 6),
+                  Text(
+                    file.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          FileUtils.extensionOf(file.name).isEmpty
-                              ? 'FILE'
-                              : FileUtils.extensionOf(file.name).toUpperCase(),
+                          file.isDirectory
+                              ? 'Carpeta'
+                              : FileUtils.fileCategory(file.name),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: FileUtils.fileColor(
-                              file.name,
-                              isDirectory: false,
-                            ),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.onSurfaceMuted,
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      if (!file.isDirectory) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              FileUtils.extensionOf(file.name).isEmpty
+                                  ? 'FILE'
+                                  : FileUtils.extensionOf(
+                                      file.name,
+                                    ).toUpperCase(),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: FileUtils.fileColor(
+                                  file.name,
+                                  isDirectory: false,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
+          ),
+          if (isSelected) const _SelectionOverlay(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionOverlay extends StatelessWidget {
+  const _SelectionOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withValues(alpha: 0.22),
+          border: Border.all(color: AppTheme.primary, width: 2),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(Icons.check_circle, color: AppTheme.primary),
           ),
         ),
       ),

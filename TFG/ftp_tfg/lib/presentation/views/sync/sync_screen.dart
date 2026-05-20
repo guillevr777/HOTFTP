@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/dump_transfer_service.dart';
+import '../../../domain/entities/dump_schedule.dart';
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../theme/app_theme.dart';
 import '../../viewmodels/dump_schedule_view_model.dart';
@@ -20,11 +21,7 @@ class SyncScreen extends StatelessWidget {
   final FtpProfile profile;
   final String ownerId;
 
-  const SyncScreen({
-    super.key,
-    required this.profile,
-    required this.ownerId,
-  });
+  const SyncScreen({super.key, required this.profile, required this.ownerId});
 
   @override
   Widget build(BuildContext context) {
@@ -46,8 +43,8 @@ class SyncScreen extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => DumpScheduleViewModel(
-            getDumpScheduleForProfile:
-                context.read<IGetDumpScheduleForProfileUseCase>(),
+            getDumpScheduleForProfile: context
+                .read<IGetDumpScheduleForProfileUseCase>(),
             saveDumpSchedule: context.read<ISaveDumpScheduleUseCase>(),
             profile: profile,
             ownerId: ownerId,
@@ -157,6 +154,8 @@ class _SyncBody extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            _ScheduleEditor(scheduleVm: scheduleVm, syncVm: vm),
             const SizedBox(height: 24),
             if (vm.isSyncing) ...[
               ClipRRect(
@@ -293,35 +292,223 @@ class _SyncBody extends StatelessWidget {
               label: const Text('Iniciar sincronizacion'),
             ),
             const SizedBox(height: 12),
-            if (scheduleVm.isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (scheduleVm.schedule != null)
-              Card(
-                child: ListTile(
-                  leading: Icon(
-                    scheduleVm.enabled
-                        ? Icons.schedule
-                        : Icons.schedule_outlined,
-                    color: scheduleVm.enabled
-                        ? AppTheme.primary
-                        : AppTheme.onSurfaceMuted,
-                  ),
-                  title: Text(
-                    scheduleVm.enabled
-                        ? 'Volcado recurrente activo'
-                        : 'Volcado recurrente desactivado',
-                  ),
-                  subtitle: Text(
-                    scheduleVm.enabled
-                        ? 'PrÃ³xima ejecuciÃ³n: ${scheduleVm.schedule!.nextRunAt ?? 'Sin fecha'}'
-                        : 'Guarda la programaciÃ³n para activarlo',
-                  ),
-                ),
-              ),
           ],
         ),
       ),
     );
+  }
+}
+
+class _ScheduleEditor extends StatelessWidget {
+  final DumpScheduleViewModel scheduleVm;
+  final SyncViewModel syncVm;
+
+  const _ScheduleEditor({required this.scheduleVm, required this.syncVm});
+
+  @override
+  Widget build(BuildContext context) {
+    final nextRun = scheduleVm.schedule?.nextRunAt;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  scheduleVm.enabled ? Icons.schedule : Icons.schedule_outlined,
+                  color: scheduleVm.enabled
+                      ? AppTheme.primary
+                      : AppTheme.onSurfaceMuted,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Programacion',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Switch(
+                  value: scheduleVm.enabled,
+                  onChanged: scheduleVm.isSaving ? null : scheduleVm.setEnabled,
+                ),
+              ],
+            ),
+            if (nextRun != null && scheduleVm.enabled) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Proxima ejecucion: ${_formatDateTime(nextRun)}',
+                style: const TextStyle(color: AppTheme.onSurfaceMuted),
+              ),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: scheduleVm.isSaving
+                  ? null
+                  : () => scheduleVm.copyFromManual(
+                      manualLocalPath: syncVm.localPath,
+                      manualRemotePath: syncVm.remotePath,
+                      manualSourceSide: _sourceSideFor(syncVm.syncMode),
+                      manualTransferMode: _transferModeFor(syncVm.syncMode),
+                    ),
+              icon: const Icon(Icons.copy_all_outlined),
+              label: const Text('Usar rutas y modo manual actuales'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('schedule-local-${scheduleVm.localPath}'),
+              initialValue: scheduleVm.localPath,
+              onChanged: scheduleVm.setLocalPath,
+              decoration: const InputDecoration(
+                labelText: 'Ruta local programada',
+                prefixIcon: Icon(Icons.phone_android),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('schedule-remote-${scheduleVm.remotePath}'),
+              initialValue: scheduleVm.remotePath,
+              onChanged: scheduleVm.setRemotePath,
+              decoration: const InputDecoration(
+                labelText: 'Ruta remota programada',
+                prefixIcon: Icon(Icons.cloud_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<DumpTransferMode>(
+              segments: const [
+                ButtonSegment(
+                  value: DumpTransferMode.oneWay,
+                  label: Text('Un sentido'),
+                  icon: Icon(Icons.arrow_forward),
+                ),
+                ButtonSegment(
+                  value: DumpTransferMode.syncBoth,
+                  label: Text('Bidireccional'),
+                  icon: Icon(Icons.sync_alt),
+                ),
+              ],
+              selected: {scheduleVm.transferMode},
+              onSelectionChanged: scheduleVm.isSaving
+                  ? null
+                  : (values) => scheduleVm.setTransferMode(values.first),
+            ),
+            const SizedBox(height: 12),
+            if (scheduleVm.transferMode == DumpTransferMode.oneWay)
+              SegmentedButton<DumpSourceSide>(
+                segments: const [
+                  ButtonSegment(
+                    value: DumpSourceSide.local,
+                    label: Text('Subir'),
+                    icon: Icon(Icons.upload),
+                  ),
+                  ButtonSegment(
+                    value: DumpSourceSide.remote,
+                    label: Text('Bajar'),
+                    icon: Icon(Icons.download),
+                  ),
+                ],
+                selected: {scheduleVm.sourceSide},
+                onSelectionChanged: scheduleVm.isSaving
+                    ? null
+                    : (values) => scheduleVm.setSourceSide(values.first),
+              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey(
+                      'schedule-interval-${scheduleVm.intervalValue}',
+                    ),
+                    initialValue: scheduleVm.intervalValue.toString(),
+                    keyboardType: TextInputType.number,
+                    onChanged: scheduleVm.setIntervalValue,
+                    decoration: const InputDecoration(
+                      labelText: 'Cada',
+                      prefixIcon: Icon(Icons.timer_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                DropdownButton<DumpIntervalUnit>(
+                  value: scheduleVm.intervalUnit,
+                  items: const [
+                    DropdownMenuItem(
+                      value: DumpIntervalUnit.hours,
+                      child: Text('horas'),
+                    ),
+                    DropdownMenuItem(
+                      value: DumpIntervalUnit.days,
+                      child: Text('dias'),
+                    ),
+                  ],
+                  onChanged: scheduleVm.isSaving
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            scheduleVm.setIntervalUnit(value);
+                          }
+                        },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: scheduleVm.deleteSourceAfterCopy,
+              onChanged: scheduleVm.isSaving
+                  ? null
+                  : (value) =>
+                        scheduleVm.setDeleteSourceAfterCopy(value ?? false),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Eliminar origen despues de copiar'),
+              subtitle: const Text('Usalo solo si quieres mover archivos.'),
+            ),
+            if (scheduleVm.error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                scheduleVm.error!,
+                style: const TextStyle(color: AppTheme.error),
+              ),
+            ],
+            if (scheduleVm.successMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                scheduleVm.successMessage!,
+                style: const TextStyle(color: AppTheme.success),
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: scheduleVm.isSaving ? null : scheduleVm.saveSchedule,
+              icon: scheduleVm.isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: const Text('Guardar programacion'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static DumpSourceSide _sourceSideFor(SyncMode mode) {
+    return mode == SyncMode.pull ? DumpSourceSide.remote : DumpSourceSide.local;
+  }
+
+  static DumpTransferMode _transferModeFor(SyncMode mode) {
+    return mode == SyncMode.bidirectional
+        ? DumpTransferMode.syncBoth
+        : DumpTransferMode.oneWay;
+  }
+
+  static String _formatDateTime(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -342,7 +529,9 @@ class _ModeSelector extends StatelessWidget {
                 child: ChoiceChip(
                   label: Text(mode.name),
                   selected: selected == mode,
-                  onSelected: onChanged == null ? null : (_) => onChanged!(mode),
+                  onSelected: onChanged == null
+                      ? null
+                      : (_) => onChanged!(mode),
                 ),
               ),
             ),
@@ -351,7 +540,3 @@ class _ModeSelector extends StatelessWidget {
     );
   }
 }
-
-
-
-
