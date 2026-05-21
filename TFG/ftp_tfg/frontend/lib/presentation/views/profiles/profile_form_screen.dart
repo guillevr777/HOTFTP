@@ -94,7 +94,7 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Editar perfil' : 'Nuevo perfil'),
+        title: Text(isEditing ? 'Editar conexion' : 'Nueva conexion'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

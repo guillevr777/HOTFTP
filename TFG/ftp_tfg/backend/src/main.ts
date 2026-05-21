@@ -9,7 +9,9 @@ async function bootstrap() {
   const dependencies = await createDependencies(env);
   const app = createApp(dependencies);
 
-  app.listen(env.port, '0.0.0.0');
+  app.listen(env.port, '0.0.0.0', () => {
+    console.log(`Backend running on http://127.0.0.1:${env.port}`);
+  });
 }
 
 void bootstrap();

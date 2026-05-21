@@ -1,4 +1,4 @@
-# HOTFTP API
+# HOTFTP Backend
 
 Backend independiente de HOTFTP con Node.js, TypeScript y una estructura inspirada en Clean Architecture.
 
@@ -102,13 +102,13 @@ Importante:
 ## Como desplegar
 
 1. Sube este proyecto a GitHub.
-2. Crea un Blueprint en Render usando `render.yaml`.
+2. Crea un Blueprint en Render usando el `render.yaml` de la raiz del repo.
 3. Render creara el servicio web y la base de datos.
 4. La variable `DATABASE_URL` se enlaza automaticamente con la base de datos.
 
 ## Checklist de produccion gratis en Render
 
-1. Confirma que `render.yaml` sigue apuntando a `npm install && npm run build` y `npm start`.
+1. Confirma que `../render.yaml` sigue apuntando a `npm install && npm run build` y `npm start`.
 2. Verifica que `DATABASE_URL` queda enlazada al Postgres del blueprint.
 3. Comprueba que `DATABASE_SSL=false` sigue aplicado para la instancia free.
 4. Revisa `API_DEMO_EMAIL`, `API_DEMO_PASSWORD` y `API_DEMO_DISPLAY_NAME`.
