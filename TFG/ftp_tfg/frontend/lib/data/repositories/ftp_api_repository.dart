@@ -258,33 +258,48 @@ class ApiFtpRepositoryImpl implements FtpRepository {
     String remotePath,
     FtpProfile profile,
   ) async {
-    final remote = await client.listRemoteFiles(
-      ownerId: _ownerIdFor(profile),
-      profileId: profile.id ?? 0,
-      path: remotePath,
+    final localEntries = await getLocalFileDetails(localPath);
+    final remoteEntries = await getRemoteFiles(remotePath, profile);
+
+    final localFiles = {
+      for (final entry in localEntries.where((entry) => !entry.isDirectory))
+        entry.name: entry,
+    };
+    final remoteFiles = {
+      for (final entry in remoteEntries.where((entry) => !entry.isDirectory))
+        entry.name: entry,
+    };
+
+    final commonNames = localFiles.keys.toSet().intersection(
+      remoteFiles.keys.toSet(),
     );
-    final currentBase = _normalizeRemotePath(remotePath) == '/'
-        ? '/'
-        : p.posix.basename(_normalizeRemotePath(remotePath));
-    final remoteNames = remote
-        .map((e) => (e['name'] as String? ?? '').trim())
-        .where(
-          (name) =>
-              name.isNotEmpty &&
-              name != '/' &&
-              name != '.' &&
-              name != '..' &&
-              name != _normalizeRemotePath(remotePath) &&
-              name != currentBase,
-        )
-        .toSet();
-    return (await getLocalFiles(localPath))
-        .where(remoteNames.contains)
+
+    return commonNames
+        .where((name) {
+          final local = localFiles[name]!;
+          final remote = remoteFiles[name]!;
+          return !_filesAreEquivalent(local, remote);
+        })
         .map(
-          (f) =>
-              SyncConflict(fileName: f, localExists: true, remoteExists: true),
+          (name) => SyncConflict(
+            fileName: name,
+            localExists: true,
+            remoteExists: true,
+          ),
         )
         .toList();
+  }
+
+  bool _filesAreEquivalent(LocalFile local, RemoteFile remote) {
+    if (local.size != remote.size) return false;
+
+    final localModified = local.lastModified;
+    final remoteModified = remote.modifiedAt;
+    if (localModified == null || remoteModified == null) {
+      return true;
+    }
+
+    return localModified.isAtSameMomentAs(remoteModified);
   }
 
   @override

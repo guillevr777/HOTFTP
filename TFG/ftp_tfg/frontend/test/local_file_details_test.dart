@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ftp_tfg/data/interfaces/ftp_datasource.dart';
 import 'package:ftp_tfg/data/repositories/ftp_repository.dart';
+import 'package:ftp_tfg/domain/entities/ftp_profile.dart';
 
 void main() {
   test('getLocalFileDetails includes folders and files', () async {
@@ -23,14 +24,55 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'detectConflicts ignores files that are identical in both sides',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'hotftp_conflict_test_',
+      );
+      addTearDown(() => tempDir.delete(recursive: true));
+
+      final localFile = File('${tempDir.path}/shared.txt');
+      await localFile.writeAsString('same content');
+      final modifiedAt = DateTime(2026, 1, 1, 12);
+      localFile.setLastModifiedSync(modifiedAt);
+
+      final repository = FtpRepositoryImpl(
+        _NoopDatasource(
+          remoteFiles: [
+            {
+              'name': 'shared.txt',
+              'size': 12,
+              'isDir': false,
+              'modifyTime': modifiedAt.toIso8601String(),
+            },
+          ],
+        ),
+      );
+
+      final conflicts = await repository.detectConflicts(
+        tempDir.path,
+        '/',
+        _profile(),
+      );
+
+      expect(conflicts, isEmpty);
+    },
+  );
 }
 
 class _NoopDatasource implements FtpDatasource {
+  _NoopDatasource({List<Map<String, dynamic>>? remoteFiles})
+    : remoteFiles = remoteFiles ?? [];
+
+  final List<Map<String, dynamic>> remoteFiles;
+
   @override
   Future<List<Map<String, dynamic>>> listRemoteFiles(
     String path,
     Map<String, dynamic> config,
-  ) async => [];
+  ) async => remoteFiles;
 
   @override
   Future<List<String>> listLocalFiles(String path) async => [];
@@ -76,4 +118,16 @@ class _NoopDatasource implements FtpDatasource {
     String remotePath,
     Map<String, dynamic> config,
   ) async {}
+}
+
+FtpProfile _profile() {
+  return FtpProfile(
+    id: 1,
+    ownerId: 'owner-1',
+    name: 'Perfil',
+    host: 'localhost',
+    port: 21,
+    username: 'user',
+    password: 'pass',
+  );
 }

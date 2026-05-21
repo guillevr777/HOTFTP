@@ -1,4 +1,4 @@
-﻿enum DumpSourceSide { local, remote }
+enum DumpSourceSide { local, remote }
 
 enum DumpTransferMode { oneWay, syncBoth }
 
@@ -77,50 +77,49 @@ class DumpSchedule {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'ownerId': ownerId,
-        'profileId': profileId,
-        'enabled': enabled ? 1 : 0,
-        'localPath': localPath,
-        'remotePath': remotePath,
-        'sourceSide': sourceSide.name,
-        'transferMode': transferMode.name,
-        'deleteSourceAfterCopy': deleteSourceAfterCopy ? 1 : 0,
-        'intervalValue': intervalValue,
-        'intervalUnit': intervalUnit.name,
-        'lastRunAt': lastRunAt?.toIso8601String(),
-        'nextRunAt': nextRunAt?.toIso8601String(),
-      };
+    'ownerId': ownerId,
+    'profileId': profileId,
+    'enabled': enabled ? 1 : 0,
+    'localPath': localPath,
+    'remotePath': remotePath,
+    'sourceSide': sourceSide.name,
+    'transferMode': transferMode.name,
+    'deleteSourceAfterCopy': deleteSourceAfterCopy ? 1 : 0,
+    'intervalValue': intervalValue,
+    'intervalUnit': intervalUnit.name,
+    if (id != null) 'id': id,
+    if (lastRunAt != null) 'lastRunAt': lastRunAt!.toUtc().toIso8601String(),
+    if (nextRunAt != null) 'nextRunAt': nextRunAt!.toUtc().toIso8601String(),
+  };
 
   factory DumpSchedule.fromMap(Map<String, dynamic> map) => DumpSchedule(
-        id: map['id'] as int?,
-        ownerId: map['ownerId'] as String? ?? '',
-        profileId: map['profileId'] as int,
-        enabled: map['enabled'] == true || map['enabled'] == 1,
-        localPath: map['localPath'] as String? ?? '',
-        remotePath: map['remotePath'] as String? ?? '/',
-        sourceSide: DumpSourceSide.values.firstWhere(
-          (value) => value.name == map['sourceSide'],
-          orElse: () => DumpSourceSide.local,
-        ),
-        transferMode: DumpTransferMode.values.firstWhere(
-          (value) => value.name == map['transferMode'],
-          orElse: () => DumpTransferMode.oneWay,
-        ),
-        deleteSourceAfterCopy:
-            map['deleteSourceAfterCopy'] == true ||
-            map['deleteSourceAfterCopy'] == 1,
-        intervalValue: map['intervalValue'] as int? ?? 24,
-        intervalUnit: DumpIntervalUnit.values.firstWhere(
-          (value) => value.name == map['intervalUnit'],
-          orElse: () => DumpIntervalUnit.hours,
-        ),
-        lastRunAt: map['lastRunAt'] == null
-            ? null
-            : DateTime.tryParse(map['lastRunAt'] as String),
-        nextRunAt: map['nextRunAt'] == null
-            ? null
-            : DateTime.tryParse(map['nextRunAt'] as String),
-      );
+    id: map['id'] as int?,
+    ownerId: map['ownerId'] as String? ?? '',
+    profileId: map['profileId'] as int,
+    enabled: map['enabled'] == true || map['enabled'] == 1,
+    localPath: map['localPath'] as String? ?? '',
+    remotePath: map['remotePath'] as String? ?? '/',
+    sourceSide: DumpSourceSide.values.firstWhere(
+      (value) => value.name == map['sourceSide'],
+      orElse: () => DumpSourceSide.local,
+    ),
+    transferMode: DumpTransferMode.values.firstWhere(
+      (value) => value.name == map['transferMode'],
+      orElse: () => DumpTransferMode.oneWay,
+    ),
+    deleteSourceAfterCopy:
+        map['deleteSourceAfterCopy'] == true ||
+        map['deleteSourceAfterCopy'] == 1,
+    intervalValue: map['intervalValue'] as int? ?? 24,
+    intervalUnit: DumpIntervalUnit.values.firstWhere(
+      (value) => value.name == map['intervalUnit'],
+      orElse: () => DumpIntervalUnit.hours,
+    ),
+    lastRunAt: map['lastRunAt'] == null
+        ? null
+        : DateTime.tryParse(map['lastRunAt'] as String),
+    nextRunAt: map['nextRunAt'] == null
+        ? null
+        : DateTime.tryParse(map['nextRunAt'] as String),
+  );
 }
-

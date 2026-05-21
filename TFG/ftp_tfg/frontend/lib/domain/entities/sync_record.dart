@@ -1,4 +1,4 @@
-﻿class SyncRecord {
+class SyncRecord {
   final int? id;
   final String ownerId;
   final int profileId;
@@ -24,29 +24,28 @@
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'ownerId': ownerId,
-        'profileId': profileId,
-        'date': date.toIso8601String(),
-        'localPath': localPath,
-        'remotePath': remotePath,
-        'mode': mode,
-        'filesTransferred': filesTransferred,
-        'filesSkipped': filesSkipped,
-        'errorMessage': errorMessage,
-      };
+    'ownerId': ownerId,
+    'profileId': profileId,
+    'date': date.toUtc().toIso8601String(),
+    'localPath': localPath,
+    'remotePath': remotePath,
+    'mode': mode,
+    'filesTransferred': filesTransferred,
+    'filesSkipped': filesSkipped,
+    if (id != null) 'id': id,
+    if (errorMessage != null) 'errorMessage': errorMessage,
+  };
 
   factory SyncRecord.fromMap(Map<String, dynamic> map) => SyncRecord(
-        id: map['id'] as int?,
-        ownerId: map['ownerId'] as String? ?? '',
-        profileId: map['profileId'] as int,
-        date: DateTime.parse(map['date'] as String),
-        localPath: map['localPath'] as String,
-        remotePath: map['remotePath'] as String,
-        mode: map['mode'] as String,
-        filesTransferred: map['filesTransferred'] as int? ?? 0,
-        filesSkipped: map['filesSkipped'] as int? ?? 0,
-        errorMessage: map['errorMessage'] as String?,
-      );
+    id: map['id'] as int?,
+    ownerId: map['ownerId'] as String? ?? '',
+    profileId: map['profileId'] as int,
+    date: DateTime.parse(map['date'] as String),
+    localPath: map['localPath'] as String,
+    remotePath: map['remotePath'] as String,
+    mode: map['mode'] as String,
+    filesTransferred: map['filesTransferred'] as int? ?? 0,
+    filesSkipped: map['filesSkipped'] as int? ?? 0,
+    errorMessage: map['errorMessage'] as String?,
+  );
 }
-

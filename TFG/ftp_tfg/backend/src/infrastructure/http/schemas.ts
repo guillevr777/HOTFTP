@@ -25,20 +25,40 @@ export const syncRunSchema = z.object({
 });
 
 export const syncRecordSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.coerce.number().int().positive().optional(),
+  ),
   ownerId: z.string().min(1),
   profileId: z.coerce.number().int().positive(),
-  date: z.string().datetime(),
+  date: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.string().datetime(),
+  ),
   localPath: z.string().default(''),
   remotePath: z.string().default('/'),
   mode: z.string().min(1),
   filesTransferred: z.coerce.number().int().nonnegative().default(0),
   filesSkipped: z.coerce.number().int().nonnegative().default(0),
-  errorMessage: z.string().optional(),
+  errorMessage: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.string().optional(),
+  ),
 });
 
 export const dumpScheduleSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.coerce.number().int().positive().optional(),
+  ),
   ownerId: z.string().min(1),
   profileId: z.coerce.number().int().positive(),
   enabled: z.coerce.boolean().default(true),
@@ -49,8 +69,18 @@ export const dumpScheduleSchema = z.object({
   deleteSourceAfterCopy: z.coerce.boolean().default(false),
   intervalValue: z.coerce.number().int().positive().default(24),
   intervalUnit: z.enum(['hours', 'days']).default('hours'),
-  lastRunAt: z.string().datetime().optional(),
-  nextRunAt: z.string().datetime().optional(),
+  lastRunAt: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.string().datetime().optional(),
+  ),
+  nextRunAt: z.preprocess(
+    (value) => value === null || value === undefined || value === ''
+      ? undefined
+      : value,
+    z.string().datetime().optional(),
+  ),
 });
 
 export const monitoringOwnerSchema = z.object({

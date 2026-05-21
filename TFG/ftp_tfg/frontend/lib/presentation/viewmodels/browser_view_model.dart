@@ -18,6 +18,7 @@ import '../../domain/interfaces/i_get_local_files_use_case.dart';
 import '../../domain/interfaces/i_get_remote_files_use_case.dart';
 import '../../domain/interfaces/i_record_file_version_use_case.dart';
 import '../../domain/interfaces/i_upload_file_use_case.dart';
+import '../../core/services/android_storage_access.dart';
 import '../../utils/file_utils.dart';
 import '../../utils/local_download_manifest_store.dart';
 
@@ -43,8 +44,8 @@ enum RemoteGridDensity { compact, medium, large }
 
 String _defaultLocalPath() {
   if (kIsWeb) return '/';
-  if (Platform.isAndroid || Platform.isIOS) {
-    return '/storage/emulated/0/Download';
+  if (Platform.isAndroid) {
+    return '/storage/emulated/0';
   }
   return Directory.current.path;
 }
@@ -749,6 +750,9 @@ class BrowserViewModel extends ChangeNotifier {
   String _normalizeLocalPath(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return _defaultLocalPath();
+    if (Platform.isAndroid && !trimmed.startsWith('/')) {
+      return p.normalize('/$trimmed');
+    }
     return p.normalize(trimmed);
   }
 
@@ -773,6 +777,17 @@ class BrowserViewModel extends ChangeNotifier {
 
   Future<void> _refreshLocalFiles(String path) async {
     try {
+      final hasAccess = await AndroidStorageAccess.ensureSharedStorageAccess(
+        openSettingsIfDenied: false,
+      );
+      if (!hasAccess) {
+        localFiles = [];
+        error =
+            'No se pudo acceder al almacenamiento compartido. Activa el permiso de archivos de la app.';
+        _notifyIfActive();
+        return;
+      }
+
       var freshFiles = await getLocalFileDetails.execute(path);
       if (currentLocalPath != path) return;
 

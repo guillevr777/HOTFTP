@@ -12,16 +12,61 @@ import 'package:ftp_tfg/domain/entities/sync_record.dart';
 import 'package:ftp_tfg/domain/repositories/ftp_repository.dart';
 
 void main() {
-  test('push syncs nested folders recursively and creates remote directories', () async {
-    final tempDir = await Directory.systemTemp.createTemp('hotftp-sync-push-');
+  test(
+    'push syncs nested folders recursively and creates remote directories',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'hotftp-sync-push-',
+      );
+      addTearDown(() => tempDir.delete(recursive: true));
+
+      await Directory(
+        p.join(tempDir.path, 'docs', 'nested'),
+      ).create(recursive: true);
+      final localFile = File(
+        p.join(tempDir.path, 'docs', 'nested', 'note.txt'),
+      );
+      await localFile.writeAsString('hello from local');
+      localFile.setLastModifiedSync(DateTime(2026, 1, 1, 12));
+
+      final repo = _InMemoryTreeRepository();
+      final service = DumpTransferService(repo);
+      final profile = _profile();
+
+      final result = await service.execute(
+        profile: profile,
+        localPath: tempDir.path,
+        remotePath: '/backup',
+        transferMode: DumpTransferMode.oneWay,
+        sourceSide: DumpSourceSide.local,
+        deleteSourceAfterCopy: false,
+      );
+
+      expect(result.transferred, 1);
+      expect(repo.createdDirectories, contains('/backup/docs'));
+      expect(repo.createdDirectories, contains('/backup/docs/nested'));
+      expect(repo.remoteFiles, contains('/backup/docs/nested/note.txt'));
+    },
+  );
+
+  test('push replaces an existing remote file when content changed', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'hotftp-sync-push-overwrite-',
+    );
     addTearDown(() => tempDir.delete(recursive: true));
 
-    await Directory(p.join(tempDir.path, 'docs', 'nested')).create(recursive: true);
-    final localFile = File(p.join(tempDir.path, 'docs', 'nested', 'note.txt'));
-    await localFile.writeAsString('hello from local');
-    localFile.setLastModifiedSync(DateTime(2026, 1, 1, 12));
+    final localFile = File(p.join(tempDir.path, 'shared.txt'));
+    await localFile.writeAsString('new local content');
+    localFile.setLastModifiedSync(DateTime(2026, 1, 5, 9));
 
     final repo = _InMemoryTreeRepository();
+    repo.seedRemoteDirectory('/backup');
+    repo.seedRemoteFile(
+      '/backup/shared.txt',
+      bytes: [1, 2, 3],
+      modifiedAt: DateTime(2026, 1, 1, 9),
+    );
+
     final service = DumpTransferService(repo);
     final profile = _profile();
 
@@ -35,9 +80,8 @@ void main() {
     );
 
     expect(result.transferred, 1);
-    expect(repo.createdDirectories, contains('/backup/docs'));
-    expect(repo.createdDirectories, contains('/backup/docs/nested'));
-    expect(repo.remoteFiles, contains('/backup/docs/nested/note.txt'));
+    expect(repo.deletedRemoteFiles, contains('/backup/shared.txt'));
+    expect(repo.remoteFiles, contains('/backup/shared.txt'));
   });
 
   test('pull syncs nested folders recursively to local disk', () async {
@@ -67,7 +111,10 @@ void main() {
     );
 
     expect(result.transferred, 1);
-    expect(File(p.join(tempDir.path, 'assets', 'images', 'logo.png')).existsSync(), isTrue);
+    expect(
+      File(p.join(tempDir.path, 'assets', 'images', 'logo.png')).existsSync(),
+      isTrue,
+    );
     expect(repo.downloadedFiles, contains('/remote/assets/images/logo.png'));
   });
 
@@ -118,14 +165,21 @@ void main() {
     expect(result.transferred, 3);
     expect(repo.uploadedFiles, contains('/sync/local-only/fresh.txt'));
     expect(repo.downloadedFiles, contains('/sync/remote-only/cloud.txt'));
-    expect(File(p.join(tempDir.path, 'remote-only', 'cloud.txt')).existsSync(), isTrue);
+    expect(
+      File(p.join(tempDir.path, 'remote-only', 'cloud.txt')).existsSync(),
+      isTrue,
+    );
   });
 
   test('bidirectional mirrors empty directories to the missing side', () async {
-    final tempDir = await Directory.systemTemp.createTemp('hotftp-sync-bidir-dirs-');
+    final tempDir = await Directory.systemTemp.createTemp(
+      'hotftp-sync-bidir-dirs-',
+    );
     addTearDown(() => tempDir.delete(recursive: true));
 
-    await Directory(p.join(tempDir.path, 'local-empty')).create(recursive: true);
+    await Directory(
+      p.join(tempDir.path, 'local-empty'),
+    ).create(recursive: true);
 
     final repo = _InMemoryTreeRepository();
     repo.seedRemoteDirectory('/sync');
@@ -145,7 +199,10 @@ void main() {
 
     expect(result.directoriesCreated, 2);
     expect(repo.createdDirectories, contains('/sync/local-empty'));
-    expect(Directory(p.join(tempDir.path, 'remote-empty')).existsSync(), isTrue);
+    expect(
+      Directory(p.join(tempDir.path, 'remote-empty')).existsSync(),
+      isTrue,
+    );
   });
 }
 
@@ -167,6 +224,7 @@ class _InMemoryTreeRepository implements FtpRepository {
   final List<String> createdDirectories = [];
   final List<String> uploadedFiles = [];
   final List<String> downloadedFiles = [];
+  final List<String> deletedRemoteFiles = [];
 
   Set<String> get remoteFiles => _files.keys.toSet();
 
@@ -185,7 +243,10 @@ class _InMemoryTreeRepository implements FtpRepository {
   }
 
   @override
-  Future<List<RemoteFile>> getRemoteFiles(String path, FtpProfile profile) async {
+  Future<List<RemoteFile>> getRemoteFiles(
+    String path,
+    FtpProfile profile,
+  ) async {
     final normalized = _normalizeRemote(path);
     final prefix = normalized == '/' ? '/' : '$normalized/';
     final seen = <String>{};
@@ -197,27 +258,33 @@ class _InMemoryTreeRepository implements FtpRepository {
       if (relative.isEmpty || relative.contains('/')) {
         if (relative.contains('/')) {
           final child = relative.split('/').first;
-          final childPath = normalized == '/' ? '/$child' : '$normalized/$child';
+          final childPath = normalized == '/'
+              ? '/$child'
+              : '$normalized/$child';
           if (seen.add(childPath)) {
-            items.add(RemoteFile(
-              name: child,
-              path: childPath,
-              size: 0,
-              isDirectory: true,
-              modifiedAt: null,
-            ));
+            items.add(
+              RemoteFile(
+                name: child,
+                path: childPath,
+                size: 0,
+                isDirectory: true,
+                modifiedAt: null,
+              ),
+            );
           }
         }
         continue;
       }
       if (seen.add(dir)) {
-        items.add(RemoteFile(
-          name: relative,
-          path: dir,
-          size: 0,
-          isDirectory: true,
-          modifiedAt: null,
-        ));
+        items.add(
+          RemoteFile(
+            name: relative,
+            path: dir,
+            size: 0,
+            isDirectory: true,
+            modifiedAt: null,
+          ),
+        );
       }
     }
 
@@ -226,13 +293,15 @@ class _InMemoryTreeRepository implements FtpRepository {
       final relative = entry.key.substring(prefix.length);
       if (relative.isEmpty || relative.contains('/')) continue;
       if (seen.add(entry.key)) {
-        items.add(RemoteFile(
-          name: relative,
-          path: entry.key,
-          size: entry.value.bytes.length,
-          isDirectory: false,
-          modifiedAt: entry.value.modifiedAt,
-        ));
+        items.add(
+          RemoteFile(
+            name: relative,
+            path: entry.key,
+            size: entry.value.bytes.length,
+            isDirectory: false,
+            modifiedAt: entry.value.modifiedAt,
+          ),
+        );
       }
     }
 
@@ -240,32 +309,51 @@ class _InMemoryTreeRepository implements FtpRepository {
   }
 
   @override
-  Future<List<String>> getLocalFiles(String path) async => throw UnimplementedError();
+  Future<List<String>> getLocalFiles(String path) async =>
+      throw UnimplementedError();
 
   @override
-  Future<List<LocalFile>> getLocalFileDetails(String path) async => throw UnimplementedError();
+  Future<List<LocalFile>> getLocalFileDetails(String path) async =>
+      throw UnimplementedError();
 
   @override
-  Future<void> uploadFile(String localPath, String remotePath, FtpProfile profile) async {
+  Future<void> uploadFile(
+    String localPath,
+    String remotePath,
+    FtpProfile profile,
+  ) async {
     final source = File(localPath);
     final bytes = await source.readAsBytes();
     final normalizedRemotePath = _normalizeRemote(remotePath);
     final fileName = p.basename(localPath);
-    final fullPath = normalizedRemotePath == '/' ? '/$fileName' : '$normalizedRemotePath/$fileName';
-    _files[fullPath] = _RemoteNode(bytes: bytes, modifiedAt: await source.lastModified());
+    final fullPath = normalizedRemotePath == '/'
+        ? '/$fileName'
+        : '$normalizedRemotePath/$fileName';
+    _files[fullPath] = _RemoteNode(
+      bytes: bytes,
+      modifiedAt: await source.lastModified(),
+    );
     _directories.add(_parentOf(fullPath));
     uploadedFiles.add(fullPath);
   }
 
   @override
-  Future<void> createRemoteDirectory(String remotePath, FtpProfile profile) async {
+  Future<void> createRemoteDirectory(
+    String remotePath,
+    FtpProfile profile,
+  ) async {
     final normalized = _normalizeRemote(remotePath);
     _directories.add(normalized);
     createdDirectories.add(normalized);
   }
 
   @override
-  Future<void> downloadFile(RemoteFile file, String localPath, FtpProfile profile, {void Function(double progress)? onProgress}) async {
+  Future<void> downloadFile(
+    RemoteFile file,
+    String localPath,
+    FtpProfile profile, {
+    void Function(double progress)? onProgress,
+  }) async {
     final node = _files[_normalizeRemote(file.path)];
     if (node == null) {
       throw StateError('Remote file not found: ${file.path}');
@@ -277,10 +365,10 @@ class _InMemoryTreeRepository implements FtpRepository {
     downloadedFiles.add(_normalizeRemote(file.path));
   }
 
-
   @override
   Future<void> deleteRemoteFile(RemoteFile file, FtpProfile profile) async {
     _files.remove(_normalizeRemote(file.path));
+    deletedRemoteFiles.add(_normalizeRemote(file.path));
   }
 
   @override
@@ -292,12 +380,20 @@ class _InMemoryTreeRepository implements FtpRepository {
   }
 
   @override
-  Future<String> downloadThumbnail(RemoteFile file, String remotePath, FtpProfile profile) async {
+  Future<String> downloadThumbnail(
+    RemoteFile file,
+    String remotePath,
+    FtpProfile profile,
+  ) async {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<SyncConflict>> detectConflicts(String localPath, String remotePath, FtpProfile profile) async {
+  Future<List<SyncConflict>> detectConflicts(
+    String localPath,
+    String remotePath,
+    FtpProfile profile,
+  ) async {
     return [];
   }
 
@@ -320,10 +416,16 @@ class _InMemoryTreeRepository implements FtpRepository {
   Future<void> deleteProfile(FtpProfile profile, String ownerId) async {}
 
   @override
-  Future<DumpSchedule?> getDumpScheduleForProfile(String ownerId, FtpProfile profile) async => null;
+  Future<DumpSchedule?> getDumpScheduleForProfile(
+    String ownerId,
+    FtpProfile profile,
+  ) async => null;
 
   @override
-  Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) async => 1;
+  Future<int> saveDumpSchedule(
+    DumpSchedule schedule,
+    FtpProfile profile,
+  ) async => 1;
 
   String _normalizeRemote(String path) {
     final trimmed = path.trim();
@@ -343,9 +445,3 @@ class _RemoteNode {
 
   _RemoteNode({required this.bytes, required this.modifiedAt});
 }
-
-
-
-
-
-

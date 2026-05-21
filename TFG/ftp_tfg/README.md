@@ -17,8 +17,10 @@ cd frontend
 flutter run
 ```
 
+Antes de ejecutar `flutter run`, selecciona el dispositivo en `Select Device` si estas usando un IDE.
 Flutter te mostrara el selector de dispositivos si hay varios disponibles.
 Tambien puedes abrir navegador o emuladores moviles desde ese mismo comando, segun lo que tengas configurado.
+Si el dispositivo cancela la instalacion, puede aparecer un error como `INSTALL_FAILED_USER_RESTRICTED`.
 
 ## Documentacion
 

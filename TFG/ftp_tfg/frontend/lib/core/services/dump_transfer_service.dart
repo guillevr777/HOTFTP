@@ -1,14 +1,14 @@
 import 'package:path/path.dart' as p;
 import 'package:universal_io/io.dart';
 
+import 'android_storage_access.dart';
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/remote_file.dart';
 import '../../domain/repositories/ftp_repository.dart';
 
-typedef DumpTransferProgressCallback = void Function(
-  DumpTransferProgress progress,
-);
+typedef DumpTransferProgressCallback =
+    void Function(DumpTransferProgress progress);
 
 class DumpTransferProgress {
   final int processed;
@@ -62,6 +62,14 @@ class DumpTransferService {
     required bool deleteSourceAfterCopy,
     DumpTransferProgressCallback? onProgress,
   }) async {
+    final hasAccess = await AndroidStorageAccess.ensureSharedStorageAccess();
+    if (!hasAccess) {
+      throw FileSystemException(
+        'No se pudo acceder al almacenamiento compartido. Activa el permiso de archivos de la app.',
+        localPath,
+      );
+    }
+
     final normalizedLocalPath = _normalizeLocalPath(localPath);
     final normalizedRemotePath = _normalizeRemotePath(remotePath);
 
@@ -145,11 +153,7 @@ class DumpTransferService {
       final localDirPath = p.join(localRoot, dir);
       final remoteDirPath = p.posix.join(remoteRoot, dir);
       if (localDirs.contains(dir) && !remoteDirs.contains(dir)) {
-        if (await _ensureRemoteDirectory(
-          remoteDirPath,
-          profile,
-          remoteDirs,
-        )) {
+        if (await _ensureRemoteDirectory(remoteDirPath, profile, remoteDirs)) {
           directoriesCreated++;
         }
       }
@@ -200,11 +204,10 @@ class DumpTransferService {
             break;
           }
           final remoteParent = _remoteParentPath(remoteRoot, relativePath);
-          await _ensureRemoteDirectory(
-            remoteParent,
-            profile,
-            remoteDirs,
-          );
+          await _ensureRemoteDirectory(remoteParent, profile, remoteDirs);
+          if (remote != null) {
+            await repository.deleteRemoteFile(remote.file, profile);
+          }
           await repository.uploadFile(local.path, remoteParent, profile);
           transferred++;
           processed++;
@@ -299,11 +302,7 @@ class DumpTransferService {
 
     for (final dir in _sortedRelativePaths(localTree.directories)) {
       final remoteDirPath = p.posix.join(remoteRoot, dir);
-      if (await _ensureRemoteDirectory(
-        remoteDirPath,
-        profile,
-        remoteDirs,
-      )) {
+      if (await _ensureRemoteDirectory(remoteDirPath, profile, remoteDirs)) {
         directoriesCreated++;
       }
       processed++;
@@ -324,7 +323,8 @@ class DumpTransferService {
     for (final relativePath in _sortedRelativePaths(localTree.files.keys)) {
       final local = localTree.files[relativePath]!;
       final remote = remoteTree.files[relativePath];
-      final shouldCopy = remote == null ||
+      final shouldCopy =
+          remote == null ||
           _shouldTransfer(
             sourceDate: local.modifiedAt,
             sourceSize: local.size,
@@ -349,6 +349,9 @@ class DumpTransferService {
       }
       final remoteParent = _remoteParentPath(remoteRoot, relativePath);
       await _ensureRemoteDirectory(remoteParent, profile, remoteDirs);
+      if (remote != null) {
+        await repository.deleteRemoteFile(remote.file, profile);
+      }
       await repository.uploadFile(local.path, remoteParent, profile);
       transferred++;
       processed++;
@@ -420,7 +423,8 @@ class DumpTransferService {
     for (final relativePath in _sortedRelativePaths(remoteTree.files.keys)) {
       final remote = remoteTree.files[relativePath]!;
       final local = localTree.files[relativePath];
-      final shouldCopy = local == null ||
+      final shouldCopy =
+          local == null ||
           _shouldTransfer(
             sourceDate: remote.modifiedAt,
             sourceSize: remote.size,
@@ -482,7 +486,10 @@ class DumpTransferService {
     }
 
     Future<void> visit(Directory current) async {
-      await for (final entity in current.list(recursive: false, followLinks: false)) {
+      await for (final entity in current.list(
+        recursive: false,
+        followLinks: false,
+      )) {
         if (entity is Directory) {
           final relative = _relativeLocalPath(root, entity.path);
           if (relative.isNotEmpty) {
@@ -506,7 +513,10 @@ class DumpTransferService {
     return _LocalTree(files: files, directories: directories);
   }
 
-  Future<_RemoteTree> _collectRemoteTree(String root, FtpProfile profile) async {
+  Future<_RemoteTree> _collectRemoteTree(
+    String root,
+    FtpProfile profile,
+  ) async {
     final files = <String, _RemoteEntry>{};
     final directories = <String>{};
 
@@ -576,11 +586,15 @@ class DumpTransferService {
 
   String _localParentPath(String localRoot, String relativePath) {
     final relativeParent = _relativeParent(relativePath);
-    return relativeParent.isEmpty ? _normalizeLocalPath(localRoot) : p.join(_normalizeLocalPath(localRoot), relativeParent);
+    return relativeParent.isEmpty
+        ? _normalizeLocalPath(localRoot)
+        : p.join(_normalizeLocalPath(localRoot), relativeParent);
   }
 
   String _localAbsolutePath(String root, String relativePath) {
-    return relativePath.isEmpty ? _normalizeLocalPath(root) : p.join(_normalizeLocalPath(root), relativePath);
+    return relativePath.isEmpty
+        ? _normalizeLocalPath(root)
+        : p.join(_normalizeLocalPath(root), relativePath);
   }
 
   String _relativeParent(String relativePath) {
@@ -681,8 +695,10 @@ class DumpTransferService {
       if (local.size == remote.size) return _TransferDirection.skip;
       return _TransferDirection.upload;
     }
-    if (localDate != null && remoteDate == null) return _TransferDirection.upload;
-    if (localDate == null && remoteDate != null) return _TransferDirection.download;
+    if (localDate != null && remoteDate == null)
+      return _TransferDirection.upload;
+    if (localDate == null && remoteDate != null)
+      return _TransferDirection.download;
     if (local.size == remote.size) return _TransferDirection.skip;
     return _TransferDirection.upload;
   }
@@ -753,5 +769,3 @@ class _RemoteEntry {
   int get size => file.size;
   DateTime? get modifiedAt => file.modifiedAt;
 }
-
-

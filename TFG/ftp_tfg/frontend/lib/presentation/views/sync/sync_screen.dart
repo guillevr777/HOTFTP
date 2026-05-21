@@ -136,7 +136,8 @@ class _SyncBody extends StatelessWidget {
                       onChanged: vm.setLocalPath,
                       decoration: const InputDecoration(
                         labelText: 'Ruta local',
-                        hintText: '/storage/emulated/0/DCIM/Camera',
+                        hintText:
+                            '/storage/emulated/0/DCIM o /storage/emulated/0/Download',
                         prefixIcon: Icon(Icons.phone_android),
                       ),
                     ),
@@ -269,7 +270,7 @@ class _SyncBody extends StatelessWidget {
                     ),
                     title: Text(c.fileName),
                     subtitle: const Text(
-                      'Existe en local y remoto',
+                      'Se omite si es igual; si cambia, se reemplaza',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
@@ -325,7 +326,7 @@ class _ScheduleEditor extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Programacion',
+                    'Activar / Desactivar programacion',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -357,7 +358,6 @@ class _ScheduleEditor extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextFormField(
-              key: ValueKey('schedule-local-${scheduleVm.localPath}'),
               initialValue: scheduleVm.localPath,
               onChanged: scheduleVm.setLocalPath,
               decoration: const InputDecoration(
@@ -367,7 +367,6 @@ class _ScheduleEditor extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextFormField(
-              key: ValueKey('schedule-remote-${scheduleVm.remotePath}'),
               initialValue: scheduleVm.remotePath,
               onChanged: scheduleVm.setRemotePath,
               decoration: const InputDecoration(
@@ -419,9 +418,6 @@ class _ScheduleEditor extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextFormField(
-                    key: ValueKey(
-                      'schedule-interval-${scheduleVm.intervalValue}',
-                    ),
                     initialValue: scheduleVm.intervalValue.toString(),
                     keyboardType: TextInputType.number,
                     onChanged: scheduleVm.setIntervalValue,

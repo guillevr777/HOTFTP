@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -162,10 +162,7 @@ class HotftpApiClient {
       }
 
       if (total > 0 && received != total) {
-        throw FileSystemException(
-          'Incomplete download',
-          targetLocalPath,
-        );
+        throw FileSystemException('Incomplete download', targetLocalPath);
       }
 
       if (onProgress != null) {
@@ -401,12 +398,3 @@ class HotftpApiClient {
     return expectedStatusCodes.contains(statusCode);
   }
 }
-
-
-
-
-
-
-
-
-

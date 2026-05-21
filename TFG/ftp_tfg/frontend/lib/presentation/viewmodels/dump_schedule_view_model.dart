@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:path/path.dart' as p;
+import 'package:universal_io/io.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
@@ -12,6 +13,9 @@ class DumpScheduleViewModel extends ChangeNotifier {
   final ISaveDumpScheduleUseCase saveDumpSchedule;
   final FtpProfile profile;
   final String ownerId;
+
+  static String get _defaultLocalPath =>
+      Platform.isAndroid ? '/storage/emulated/0' : Directory.current.path;
 
   DumpScheduleViewModel({
     required this.getDumpScheduleForProfile,
@@ -27,7 +31,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
   String? successMessage;
 
   bool enabled = false;
-  String localPath = '/storage/emulated/0/Download';
+  String localPath = _defaultLocalPath;
   String remotePath = '/';
   DumpSourceSide sourceSide = DumpSourceSide.local;
   DumpTransferMode transferMode = DumpTransferMode.oneWay;
@@ -66,7 +70,14 @@ class DumpScheduleViewModel extends ChangeNotifier {
   }
 
   void setLocalPath(String value) {
-    localPath = value.trim();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      localPath = _defaultLocalPath;
+    } else if (Platform.isAndroid && !trimmed.startsWith('/')) {
+      localPath = p.normalize('/$trimmed');
+    } else {
+      localPath = p.normalize(trimmed);
+    }
     notifyListeners();
   }
 
@@ -109,7 +120,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     required DumpTransferMode manualTransferMode,
   }) {
     localPath = manualLocalPath.trim().isEmpty
-        ? '/storage/emulated/0/Download'
+        ? _defaultLocalPath
         : manualLocalPath.trim();
     remotePath = _normalizeRemotePath(manualRemotePath);
     sourceSide = manualSourceSide;

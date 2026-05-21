@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:universal_io/io.dart';
 
 import '../../core/services/dump_transfer_service.dart';
 import '../../domain/entities/dump_schedule.dart';
@@ -30,6 +31,9 @@ class SyncViewModel extends ChangeNotifier {
   final String ownerId;
   final DumpTransferService transferService;
 
+  static String get _defaultLocalPath =>
+      Platform.isAndroid ? '/storage/emulated/0' : Directory.current.path;
+
   SyncViewModel({
     required IDetectConflictsUseCase detectConflicts,
     required ISaveSyncRecordUseCase saveSyncRecord,
@@ -41,16 +45,16 @@ class SyncViewModel extends ChangeNotifier {
     required this.profile,
     required this.ownerId,
     required this.transferService,
-  })  : _detectConflicts = detectConflicts,
-        _saveSyncRecord = saveSyncRecord,
-        _getSyncHistory = getSyncHistory,
-        _getActiveAlerts = getActiveAlerts,
-        _evaluateSyncRules = evaluateSyncRules,
-        _recordEvent = recordEvent,
-        _createAlert = createAlert;
+  }) : _detectConflicts = detectConflicts,
+       _saveSyncRecord = saveSyncRecord,
+       _getSyncHistory = getSyncHistory,
+       _getActiveAlerts = getActiveAlerts,
+       _evaluateSyncRules = evaluateSyncRules,
+       _recordEvent = recordEvent,
+       _createAlert = createAlert;
 
   SyncMode syncMode = SyncMode.bidirectional;
-  String localPath = '/storage/emulated/0/Download';
+  String localPath = _defaultLocalPath;
   String remotePath = '/';
   bool isSyncing = false;
   bool isDone = false;
@@ -71,7 +75,14 @@ class SyncViewModel extends ChangeNotifier {
   }
 
   void setLocalPath(String value) {
-    localPath = value.trim();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      localPath = _defaultLocalPath;
+    } else if (Platform.isAndroid && !trimmed.startsWith('/')) {
+      localPath = p.normalize('/$trimmed');
+    } else {
+      localPath = p.normalize(trimmed);
+    }
     notifyListeners();
   }
 
@@ -108,7 +119,11 @@ class SyncViewModel extends ChangeNotifier {
         title: 'SincronizaciÃ³n iniciada',
         message: 'Se ha iniciado la sincronizaciÃ³n manual.',
       );
-      conflicts = await _detectConflicts.execute(localPath, remotePath, profile);
+      conflicts = await _detectConflicts.execute(
+        localPath,
+        remotePath,
+        profile,
+      );
       final transferMode = syncMode == SyncMode.bidirectional
           ? DumpTransferMode.syncBoth
           : DumpTransferMode.oneWay;
@@ -117,9 +132,7 @@ class SyncViewModel extends ChangeNotifier {
           : DumpSourceSide.local;
       final result = await transferService.execute(
         profile: profile,
-        localPath: localPath.isEmpty
-            ? '/storage/emulated/0/Download'
-            : localPath,
+        localPath: localPath.isEmpty ? _defaultLocalPath : localPath,
         remotePath: remotePath.isEmpty ? '/' : remotePath,
         transferMode: transferMode,
         sourceSide: sourceSide,
@@ -287,7 +300,3 @@ class SyncViewModel extends ChangeNotifier {
     }
   }
 }
-
-
-
-
