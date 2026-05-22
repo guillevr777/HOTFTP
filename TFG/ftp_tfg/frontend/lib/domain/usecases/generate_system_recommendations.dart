@@ -31,7 +31,7 @@ class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUse
         const SystemRecommendation(
           title: 'Analizar fallos repetidos',
           message:
-              'Se detectan varios errores de sincronizaciÃ³n. Revisa credenciales, conectividad y permisos del servidor.',
+              'Se detectan varios errores de sincronización. Revisa credenciales, conectividad y permisos del servidor.',
           kind: SystemRecommendationKind.warning,
         ),
       );
@@ -40,9 +40,9 @@ class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUse
     if (summary.lastSyncAt == null) {
       recommendations.add(
         const SystemRecommendation(
-          title: 'Configurar la primera sincronizaciÃ³n',
+          title: 'Configurar la primera sincronización',
           message:
-              'AÃºn no hay sincronizaciones registradas. Crear una tarea automÃ¡tica te permitirÃ¡ empezar a generar histÃ³rico Ãºtil.',
+              'Aún no hay sincronizaciones registradas. Crear una tarea automática te permitirá empezar a generar histórico útil.',
           kind: SystemRecommendationKind.action,
         ),
       );
@@ -52,9 +52,9 @@ class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUse
       if (hoursSinceLastSync >= 24) {
         recommendations.add(
           SystemRecommendation(
-            title: 'Programar una sincronizaciÃ³n',
+            title: 'Programar una sincronización',
             message:
-                'La Ãºltima sincronizaciÃ³n fue hace $hoursSinceLastSync horas. Una tarea recurrente reducirÃ­a el riesgo de desactualizaciÃ³n.',
+                'La última sincronización fue hace $hoursSinceLastSync horas. Una tarea recurrente reduciría el riesgo de desactualización.',
             kind: SystemRecommendationKind.warning,
           ),
         );
@@ -72,7 +72,7 @@ class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUse
         SystemRecommendation(
           title: 'Ventana recomendada de backups',
           message:
-              'Tus sincronizaciones exitosas suelen concentrarse alrededor de las ${averageHour.toString().padLeft(2, '0')}:00. Esa podrÃ­a ser una buena franja para automatizar backups.',
+              'Tus sincronizaciones exitosas suelen concentrarse alrededor de las ${averageHour.toString().padLeft(2, '0')}:00. Esa podría ser una buena franja para automatizar backups.',
           kind: SystemRecommendationKind.positive,
         ),
       );
@@ -94,7 +94,7 @@ class GenerateSystemRecommendations implements IGenerateSystemRecommendationsUse
         const SystemRecommendation(
           title: 'Seguir monitorizando',
           message:
-              'TodavÃ­a no hay suficiente actividad para generar recomendaciones precisas. ContinÃºa usando la app para mejorar la predicciÃ³n.',
+              'Todavía no hay suficiente actividad para generar recomendaciones precisas. Continúa usando la app para mejorar la predicción.',
           kind: SystemRecommendationKind.warning,
         ),
       );

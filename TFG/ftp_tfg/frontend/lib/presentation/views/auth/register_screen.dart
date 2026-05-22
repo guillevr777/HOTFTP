@@ -68,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Cada usuario tendrÃ¡ su sesiÃ³n Firebase y acceso propio a los perfiles.',
+                'Cada usuario tendrá su sesión Firebase y acceso propio a los perfiles.',
                 style: TextStyle(color: AppTheme.onSurfaceMuted),
               ),
               const SizedBox(height: 24),
@@ -86,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'Correo electrÃ³nico',
+                  labelText: 'Correo electrónico',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 validator: (value) {
@@ -94,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return 'Introduce un correo';
                   }
                   if (!value.contains('@')) {
-                    return 'Introduce un correo vÃ¡lido';
+                    return 'Introduce un correo válido';
                   }
                   return null;
                 },
@@ -104,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
-                  labelText: 'ContraseÃ±a',
+                  labelText: 'Contraseña',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -126,7 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _confirmController,
                 obscureText: _obscureConfirm,
                 decoration: InputDecoration(
-                  labelText: 'Confirmar contraseÃ±a',
+                  labelText: 'Confirmar contraseña',
                   prefixIcon: const Icon(Icons.lock_reset_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -138,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: (value) {
                   if (value != _passwordController.text) {
-                    return 'Las contraseÃ±as no coinciden';
+                    return 'Las contraseñas no coinciden';
                   }
                   return null;
                 },

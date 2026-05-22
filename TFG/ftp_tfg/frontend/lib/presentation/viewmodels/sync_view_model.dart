@@ -116,8 +116,8 @@ class SyncViewModel extends ChangeNotifier {
       await _trackEvent(
         eventType: 'sync_started',
         severity: SystemEventSeverity.info,
-        title: 'SincronizaciÃ³n iniciada',
-        message: 'Se ha iniciado la sincronizaciÃ³n manual.',
+        title: 'Sincronización iniciada',
+        message: 'Se ha iniciado la sincronización manual.',
       );
       conflicts = await _detectConflicts.execute(
         localPath,
@@ -171,23 +171,23 @@ class SyncViewModel extends ChangeNotifier {
       await _trackEvent(
         eventType: 'sync_completed',
         severity: SystemEventSeverity.success,
-        title: 'SincronizaciÃ³n completada',
+        title: 'Sincronización completada',
         message:
             'Se han transferido $filesTransferred archivos, se han creado $directoriesCreated carpetas y se han omitido $filesSkipped elementos.',
       );
       isDone = true;
     } catch (e) {
-      error = 'Error durante la sincronizacion: $e';
+      error = 'Error durante la sincronización: $e';
       await _trackEvent(
         eventType: 'sync_failed',
         severity: SystemEventSeverity.error,
-        title: 'Error de sincronizaciÃ³n',
+        title: 'Error de sincronización',
         message: error!,
       );
       await _trackAlert(
         source: 'sync',
         severity: SystemAlertSeverity.error,
-        title: 'SincronizaciÃ³n con error',
+        title: 'Sincronización con error',
         message: error!,
       );
       await _applyAutomaticRules();
@@ -254,7 +254,7 @@ class SyncViewModel extends ChangeNotifier {
         ),
       );
     } catch (_) {
-      // La monitorizaciÃ³n nunca debe bloquear la sincronizaciÃ³n.
+      // La monitorización nunca debe bloquear la sincronización.
     }
   }
 
@@ -296,7 +296,7 @@ class SyncViewModel extends ChangeNotifier {
         await _createAlert.execute(alert);
       }
     } catch (_) {
-      // Las reglas automÃ¡ticas no deben romper la sincronizaciÃ³n manual.
+      // Las reglas automáticas no deben romper la sincronización manual.
     }
   }
 }

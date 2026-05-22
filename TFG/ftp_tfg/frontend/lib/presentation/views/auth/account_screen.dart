@@ -69,7 +69,7 @@ class AccountScreen extends StatelessWidget {
                               active: hasGoogleAccess,
                             ),
                             _MethodChip(
-                              label: 'Correo y contraseÃ±a',
+                              label: 'Correo y contraseña',
                               icon: Icons.lock_outline,
                               active: hasPasswordAccess,
                             ),
@@ -84,7 +84,7 @@ class AccountScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Acciones rÃ¡pidas',
+            'Acciones rápidas',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -93,11 +93,11 @@ class AccountScreen extends StatelessWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.link_outlined),
-                  title: const Text('Vincular correo y contraseÃ±a'),
+                  title: const Text('Vincular correo y contraseña'),
                   subtitle: Text(
                     hasPasswordAccess
-                        ? 'Esta cuenta ya puede entrar con correo y contraseÃ±a.'
-                        : 'AÃ±ade un acceso alternativo para entrar sin Google.',
+                        ? 'Esta cuenta ya puede entrar con correo y contraseña.'
+                        : 'Añade un acceso alternativo para entrar sin Google.',
                   ),
                   onTap:
                       authVm.isLoading ||
@@ -115,14 +115,14 @@ class AccountScreen extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Se usarÃ¡ el correo ${user?.email ?? ''} para crear el acceso con contraseÃ±a.',
+                                    'Se usará el correo ${user?.email ?? ''} para crear el acceso con contraseña.',
                                   ),
                                   const SizedBox(height: 16),
                                   TextField(
                                     controller: passwordController,
                                     obscureText: true,
                                     decoration: const InputDecoration(
-                                      labelText: 'Nueva contraseÃ±a',
+                                      labelText: 'Nueva contraseña',
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -130,7 +130,7 @@ class AccountScreen extends StatelessWidget {
                                     controller: confirmController,
                                     obscureText: true,
                                     decoration: const InputDecoration(
-                                      labelText: 'Confirmar contraseÃ±a',
+                                      labelText: 'Confirmar contraseña',
                                     ),
                                   ),
                                 ],
@@ -155,7 +155,7 @@ class AccountScreen extends StatelessWidget {
                                       ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                            'Las contraseÃ±as no coinciden.',
+                                            'Las contraseñas no coinciden.',
                                           ),
                                           backgroundColor: AppTheme.error,
                                         ),
@@ -176,7 +176,7 @@ class AccountScreen extends StatelessWidget {
                             SnackBar(
                               content: Text(
                                 ok
-                                    ? 'Acceso con correo y contraseÃ±a vinculado.'
+                                    ? 'Acceso con correo y contraseña vinculado.'
                                     : authVm.error ??
                                           'No se pudo vincular el acceso.',
                               ),
@@ -246,9 +246,9 @@ class AccountScreen extends StatelessWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.lock_reset),
-                  title: const Text('Reenviar correo de recuperaciÃ³n'),
+                  title: const Text('Reenviar correo de recuperación'),
                   subtitle: const Text(
-                    'Disponible cuando la cuenta tiene acceso con contraseÃ±a.',
+                    'Disponible cuando la cuenta tiene acceso con contraseña.',
                   ),
                   onTap: user?.email == null || !hasPasswordAccess
                       ? null
@@ -261,7 +261,7 @@ class AccountScreen extends StatelessWidget {
                             SnackBar(
                               content: Text(
                                 ok
-                                    ? 'Correo de recuperaciÃ³n enviado. Revisa spam si no llega enseguida.'
+                                    ? 'Correo de recuperación enviado. Revisa spam si no llega enseguida.'
                                     : authVm.error ??
                                           'No se pudo enviar el correo.',
                               ),
@@ -275,7 +275,7 @@ class AccountScreen extends StatelessWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.logout, color: AppTheme.error),
-                  title: const Text('Cerrar sesiÃ³n'),
+                  title: const Text('Cerrar sesión'),
                   subtitle: const Text('Salir de la cuenta actual.'),
                   onTap: authVm.isLoading ? null : () => authVm.logout(),
                 ),

@@ -5,12 +5,15 @@ import 'package:universal_io/io.dart';
 
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
+import '../../domain/entities/system_event.dart';
+import '../../domain/interfaces/i_record_event_use_case.dart';
 import '../../domain/interfaces/i_get_dump_schedule_for_profile_use_case.dart';
 import '../../domain/interfaces/i_save_dump_schedule_use_case.dart';
 
 class DumpScheduleViewModel extends ChangeNotifier {
   final IGetDumpScheduleForProfileUseCase getDumpScheduleForProfile;
   final ISaveDumpScheduleUseCase saveDumpSchedule;
+  final IRecordEventUseCase recordEvent;
   final FtpProfile profile;
   final String ownerId;
 
@@ -20,6 +23,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
   DumpScheduleViewModel({
     required this.getDumpScheduleForProfile,
     required this.saveDumpSchedule,
+    required this.recordEvent,
     required this.profile,
     required this.ownerId,
   });
@@ -149,6 +153,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     successMessage = null;
     notifyListeners();
     try {
+      final isNewSchedule = schedule?.id == null;
       final now = DateTime.now();
       final nextRun = enabled
           ? DumpSchedule(
@@ -186,6 +191,22 @@ class DumpScheduleViewModel extends ChangeNotifier {
       successMessage = enabled
           ? 'Volcado recurrente guardado'
           : 'Volcado recurrente desactivado';
+      await _trackEvent(
+        eventType: isNewSchedule
+            ? 'schedule_created'
+            : enabled
+            ? 'schedule_updated'
+            : 'schedule_disabled',
+        severity: enabled ? SystemEventSeverity.success : SystemEventSeverity.warning,
+        title: isNewSchedule
+            ? 'Programación creada'
+            : enabled
+            ? 'Programación actualizada'
+            : 'Programación desactivada',
+        message: enabled
+            ? 'Se guardó una sincronización programada para "${profile.name}" cada $intervalValue ${_intervalUnitLabel(intervalUnit)}.'
+            : 'Se desactivó la sincronización programada de "${profile.name}".',
+      );
     } catch (e) {
       error = 'No se pudo guardar la programacion: $e';
     } finally {
@@ -198,5 +219,35 @@ class DumpScheduleViewModel extends ChangeNotifier {
     error = null;
     successMessage = null;
     notifyListeners();
+  }
+
+  Future<void> _trackEvent({
+    required String eventType,
+    required SystemEventSeverity severity,
+    required String title,
+    required String message,
+  }) async {
+    try {
+      await recordEvent.execute(
+        SystemEvent(
+          ownerId: ownerId,
+          eventType: eventType,
+          severity: severity,
+          title: title,
+          message: message,
+          relatedProfileId: profile.id,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } catch (_) {
+      // La programación no debe romper la experiencia del usuario.
+    }
+  }
+
+  String _intervalUnitLabel(DumpIntervalUnit unit) {
+    return switch (unit) {
+      DumpIntervalUnit.hours => 'hora${intervalValue == 1 ? '' : 's'}',
+      DumpIntervalUnit.days => 'día${intervalValue == 1 ? '' : 's'}',
+    };
   }
 }

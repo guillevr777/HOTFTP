@@ -131,7 +131,7 @@ class _VersionDetailCard extends StatelessWidget {
                 const Icon(Icons.restore_rounded, color: AppTheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'VersiÃ³n ${version.versionNumber}',
+                  'Versión ${version.versionNumber}',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ],
@@ -143,7 +143,7 @@ class _VersionDetailCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'TamaÃ±o: ${version.size} bytes',
+              'Tamaño: ${version.size} bytes',
               style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceMuted),
             ),
             const SizedBox(height: 4),

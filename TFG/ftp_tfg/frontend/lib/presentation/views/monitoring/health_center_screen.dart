@@ -15,6 +15,7 @@ import '../../../domain/interfaces/i_acknowledge_alert_use_case.dart';
 import '../../../domain/interfaces/i_analyze_system_usage_use_case.dart';
 import '../../../domain/interfaces/i_build_system_health_report_use_case.dart';
 import '../../../domain/interfaces/i_generate_system_recommendations_use_case.dart';
+import '../../../domain/interfaces/i_get_dump_schedule_for_profile_use_case.dart';
 import '../../../domain/interfaces/i_get_active_alerts_use_case.dart';
 import '../../../domain/interfaces/i_get_health_summary_use_case.dart';
 import '../../../domain/interfaces/i_get_profiles_use_case.dart';
@@ -40,6 +41,8 @@ class HealthCenterScreen extends StatelessWidget {
         getRecentSyncs: context.read<IGetRecentSyncsUseCase>(),
         getRecentFileVersions: context.read<IGetRecentFileVersionsUseCase>(),
         getProfiles: context.read<IGetProfilesUseCase>(),
+        getDumpScheduleForProfile:
+            context.read<IGetDumpScheduleForProfileUseCase>(),
         acknowledgeAlert: context.read<IAcknowledgeAlertUseCase>(),
         ownerId: ownerId,
         buildSystemHealthReport:
@@ -113,20 +116,20 @@ class _HealthCenterBody extends StatelessWidget {
                     _Banner(
                       color: AppTheme.success.withValues(alpha: 0.1),
                       icon: Icons.check_circle_outline,
-                      text: 'Ãšltimo informe exportado en ${vm.lastExportPath}',
+                      text: 'Último informe exportado en ${vm.lastExportPath}',
                     ),
                     const SizedBox(height: 16),
                   ],
                   _StatusCard(summary: summary),
                   const SizedBox(height: 16),
                   _SectionHeader(
-                    title: 'EstadÃ­sticas y patrones',
+                    title: 'Estadísticas y patrones',
                     subtitle:
-                        'AnÃ¡lisis de uso para apoyar decisiones automÃ¡ticas',
+                        'Análisis de uso para apoyar decisiones automáticas',
                   ),
                   const SizedBox(height: 8),
                   if (vm.usageStats == null)
-                    const _EmptyState(text: 'TodavÃ­a no hay suficientes datos')
+                    const _EmptyState(text: 'Todavía no hay suficientes datos')
                   else
                     _UsageStatsCard(stats: vm.usageStats!),
                   const SizedBox(height: 16),
@@ -136,7 +139,7 @@ class _HealthCenterBody extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   if (vm.recommendations.isEmpty)
-                    const _EmptyState(text: 'TodavÃ­a no hay recomendaciones')
+                    const _EmptyState(text: 'Todavía no hay recomendaciones')
                   else
                     ...vm.recommendations.map(
                       (recommendation) => Padding(
@@ -154,7 +157,7 @@ class _HealthCenterBody extends StatelessWidget {
                   const SizedBox(height: 8),
                   if (vm.recentFileVersions.isEmpty)
                     const _EmptyState(
-                      text: 'TodavÃ­a no hay versiones registradas',
+                      text: 'Todavía no hay versiones registradas',
                     )
                   else
                     ...vm.recentFileVersions.map(
@@ -179,7 +182,7 @@ class _HealthCenterBody extends StatelessWidget {
                   const SizedBox(height: 16),
                   _SectionHeader(
                     title: 'Alertas activas',
-                    subtitle: 'SeÃ±ales que requieren revisiÃ³n',
+                    subtitle: 'Señales que requieren revisión',
                   ),
                   const SizedBox(height: 8),
                   if (vm.activeAlerts.isEmpty)
@@ -190,18 +193,20 @@ class _HealthCenterBody extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _AlertCard(
                           alert: alert,
-                          onAcknowledge: () => vm.acknowledgeAlert(alert),
+                          onAcknowledge: alert.id == null
+                              ? null
+                              : () => vm.acknowledgeAlert(alert),
                         ),
                       ),
                     ),
                   const SizedBox(height: 16),
                   _SectionHeader(
                     title: 'Actividad reciente',
-                    subtitle: 'AuditorÃ­a tÃ©cnica de sincronizaciÃ³n y eventos',
+                    subtitle: 'Auditoría técnica de sincronización y eventos',
                   ),
                   const SizedBox(height: 8),
                   if (vm.recentEvents.isEmpty)
-                    const _EmptyState(text: 'TodavÃ­a no hay eventos')
+                    const _EmptyState(text: 'Todavía no hay eventos')
                   else
                     ...vm.recentEvents.map(
                       (event) => Padding(
@@ -285,7 +290,7 @@ class _StatusCard extends StatelessWidget {
                 summary?.lastEventAt != null) ...[
               const SizedBox(height: 12),
               Text(
-                'Ãšltima sincronizaciÃ³n: ${summary?.lastSyncAt != null ? summary!.lastSyncAt!.toLocal() : 'Sin datos'}',
+                'Última sincronización: ${summary?.lastSyncAt != null ? summary!.lastSyncAt!.toLocal() : 'Sin datos'}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.onSurfaceMuted,
@@ -293,7 +298,7 @@ class _StatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Ãšltimo evento: ${summary?.lastEventAt != null ? summary!.lastEventAt!.toLocal() : 'Sin datos'}',
+                'Último evento: ${summary?.lastEventAt != null ? summary!.lastEventAt!.toLocal() : 'Sin datos'}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.onSurfaceMuted,
@@ -432,7 +437,7 @@ class _UsageStatsCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'Ã‰xito: ${(stats.successRate * 100).toStringAsFixed(0)}%, perfil top: ${stats.topProfileName ?? 'Sin datos'}',
+          'Éxito: ${(stats.successRate * 100).toStringAsFixed(0)}%, perfil top: ${stats.topProfileName ?? 'Sin datos'}',
         ),
       ),
     );
@@ -475,9 +480,9 @@ class _VersionCard extends StatelessWidget {
 
 class _AlertCard extends StatelessWidget {
   final SystemAlert alert;
-  final VoidCallback onAcknowledge;
+  final VoidCallback? onAcknowledge;
 
-  const _AlertCard({required this.alert, required this.onAcknowledge});
+  const _AlertCard({required this.alert, this.onAcknowledge});
 
   @override
   Widget build(BuildContext context) {
@@ -485,10 +490,14 @@ class _AlertCard extends StatelessWidget {
       child: ListTile(
         title: Text(alert.title),
         subtitle: Text(alert.message),
-        trailing: TextButton(
-          onPressed: onAcknowledge,
-          child: const Text('OK'),
-        ),
+        trailing: onAcknowledge == null
+            ? (alert.source == 'schedule'
+                ? const Icon(Icons.schedule_outlined)
+                : null)
+            : TextButton(
+                onPressed: onAcknowledge,
+                child: const Text('OK'),
+              ),
       ),
     );
   }

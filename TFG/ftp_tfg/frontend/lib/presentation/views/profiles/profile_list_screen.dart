@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
@@ -13,24 +13,13 @@ import 'profile_form_screen.dart';
 class ProfileListScreen extends StatefulWidget {
   final String ownerId;
 
-  const ProfileListScreen({
-    super.key,
-    required this.ownerId,
-  });
+  const ProfileListScreen({super.key, required this.ownerId});
 
   @override
   State<ProfileListScreen> createState() => _ProfileListScreenState();
 }
 
 class _ProfileListScreenState extends State<ProfileListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileViewModel>().loadProfiles();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final profileVm = context.watch<ProfileViewModel>();
@@ -77,7 +66,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'Cerrar sesiÃ³n',
+            tooltip: 'Cerrar sesión',
             icon: const Icon(Icons.logout),
             onPressed: authVm.isLoading
                 ? null
@@ -138,7 +127,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
           profile: profile,
           onConnect: () => _connect(context, profile),
           onEdit: () => _openForm(context, profile),
-              onDelete: () => _confirmDelete(context, vm, profile),
+          onDelete: () => _confirmDelete(context, vm, profile),
         );
       },
     );
@@ -164,15 +153,17 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RemoteBrowserScreen(
-          profile: profile,
-          ownerId: widget.ownerId,
-        ),
+        builder: (_) =>
+            RemoteBrowserScreen(profile: profile, ownerId: widget.ownerId),
       ),
     );
   }
 
-  void _confirmDelete(BuildContext context, ProfileViewModel vm, FtpProfile profile) {
+  void _confirmDelete(
+    BuildContext context,
+    ProfileViewModel vm,
+    FtpProfile profile,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -352,6 +343,3 @@ class _ProtocolBadge extends StatelessWidget {
     );
   }
 }
-
-
-

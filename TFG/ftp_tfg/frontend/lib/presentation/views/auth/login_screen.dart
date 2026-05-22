@@ -58,12 +58,12 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (ctx) {
         final dialogController = TextEditingController(text: email);
         return AlertDialog(
-          title: const Text('Recuperar contraseÃ±a'),
+          title: const Text('Recuperar contraseña'),
           content: TextField(
             controller: dialogController,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              labelText: 'Correo electrÃ³nico',
+              labelText: 'Correo electrónico',
               hintText: 'usuario@dominio.com',
             ),
           ),
@@ -88,8 +88,8 @@ class _LoginScreenState extends State<LoginScreen> {
       SnackBar(
         content: Text(
           ok
-              ? 'Te hemos enviado un correo para restablecer la contraseÃ±a. Revisa tambiÃ©n spam.'
-              : vm.error ?? 'No se pudo enviar el correo de recuperaciÃ³n',
+              ? 'Te hemos enviado un correo para restablecer la contraseña. Revisa también spam.'
+              : vm.error ?? 'No se pudo enviar el correo de recuperación',
         ),
         backgroundColor: ok ? AppTheme.success : AppTheme.error,
       ),
@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Accede con tu correo o inicia sesiÃ³n con Google.',
+                            'Accede con tu correo o inicia sesión con Google.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: AppTheme.onSurfaceMuted),
                           ),
@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              labelText: 'Correo electrÃ³nico',
+                              labelText: 'Correo electrónico',
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
                             validator: (value) {
@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return 'Introduce tu correo';
                               }
                               if (!value.contains('@')) {
-                                return 'Introduce un correo vÃ¡lido';
+                                return 'Introduce un correo válido';
                               }
                               return null;
                             },
@@ -166,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              labelText: 'ContraseÃ±a',
+                              labelText: 'Contraseña',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             validator: (value) => value == null || value.isEmpty
-                                ? 'Introduce tu contraseÃ±a'
+                                ? 'Introduce tu contraseña'
                                 : null,
                           ),
                           const SizedBox(height: 24),
@@ -196,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   )
                                 : const Icon(Icons.login),
                             label: Text(
-                              vm.isLoading ? 'Entrando...' : 'Iniciar sesiÃ³n',
+                              vm.isLoading ? 'Entrando...' : 'Iniciar sesión',
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? null
                                   : () => _forgotPassword(vm),
                               child: const Text(
-                                'Â¿Has olvidado tu contraseÃ±a?',
+                                '¿Has olvidado tu contraseña?',
                               ),
                             ),
                           ),

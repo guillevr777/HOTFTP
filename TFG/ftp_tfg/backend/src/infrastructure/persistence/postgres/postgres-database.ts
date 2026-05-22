@@ -171,6 +171,17 @@ export class PostgresDatabase {
   }
 
   private async seedDemoUser() {
+    if (
+      !this.config.demoUserEmail ||
+      !this.config.demoUserPassword ||
+      !this.config.demoUserDisplayName ||
+      this.config.demoUserEmail.startsWith('__SET_') ||
+      this.config.demoUserPassword.startsWith('__SET_') ||
+      this.config.demoUserDisplayName.startsWith('__SET_')
+    ) {
+      return;
+    }
+
     const passwordHash = createHash('sha256')
       .update(this.config.demoUserPassword)
       .digest('hex');

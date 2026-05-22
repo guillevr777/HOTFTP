@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/dump_transfer_service.dart';
@@ -27,18 +27,22 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => SyncViewModel(
-        detectConflicts: context.read<IDetectConflictsUseCase>(),
-        saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
-        getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
-        getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
-        evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
-        recordEvent: context.read<IRecordEventUseCase>(),
-        createAlert: context.read<ICreateAlertUseCase>(),
-        profile: profile,
-        ownerId: ownerId,
-        transferService: context.read<DumpTransferService>(),
-      )..loadHistory(),
+      create: (context) {
+        final vm = SyncViewModel(
+          detectConflicts: context.read<IDetectConflictsUseCase>(),
+          saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
+          getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
+          getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
+          evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
+          recordEvent: context.read<IRecordEventUseCase>(),
+          createAlert: context.read<ICreateAlertUseCase>(),
+          profile: profile,
+          ownerId: ownerId,
+          transferService: context.read<DumpTransferService>(),
+        );
+        Future.microtask(vm.loadHistory);
+        return vm;
+      },
       child: const _HistoryBody(),
     );
   }
@@ -160,10 +164,7 @@ class _HistoryCard extends StatelessWidget {
                 ),
                 child: Text(
                   record.errorMessage!,
-                  style: const TextStyle(
-                    color: AppTheme.error,
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: AppTheme.error, fontSize: 12),
                 ),
               ),
             ],
@@ -192,10 +193,7 @@ class _InfoRow extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: const TextStyle(
-            color: AppTheme.onSurfaceMuted,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
         ),
         Expanded(
           child: Text(
@@ -208,7 +206,3 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-
-
-
-

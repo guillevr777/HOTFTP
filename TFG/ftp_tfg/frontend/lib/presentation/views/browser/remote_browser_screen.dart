@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:provider/provider.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
@@ -13,6 +14,7 @@ import '../../../domain/interfaces/i_get_latest_file_version_use_case.dart';
 import '../../../domain/interfaces/i_get_local_file_details_use_case.dart';
 import '../../../domain/interfaces/i_get_local_files_use_case.dart';
 import '../../../domain/interfaces/i_get_remote_files_use_case.dart';
+import '../../../domain/interfaces/i_record_event_use_case.dart';
 import '../../../domain/interfaces/i_record_file_version_use_case.dart';
 import '../../../domain/interfaces/i_upload_file_use_case.dart';
 import '../../../theme/app_theme.dart';
@@ -25,7 +27,7 @@ import 'browser_file_preview_screen.dart';
 import 'local_browser_file_grid_tile.dart';
 import 'local_browser_file_preview_screen.dart';
 
-class RemoteBrowserScreen extends StatelessWidget {
+class RemoteBrowserScreen extends StatefulWidget {
   final FtpProfile profile;
   final String ownerId;
 
@@ -36,28 +38,47 @@ class RemoteBrowserScreen extends StatelessWidget {
   });
 
   @override
+  State<RemoteBrowserScreen> createState() => _RemoteBrowserScreenState();
+}
+
+class _RemoteBrowserScreenState extends State<RemoteBrowserScreen> {
+  late final BrowserViewModel _vm;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _vm = BrowserViewModel(
+      getRemoteFiles: context.read<IGetRemoteFilesUseCase>(),
+      getLocalFiles: context.read<IGetLocalFilesUseCase>(),
+      getLocalFileDetails: context.read<IGetLocalFileDetailsUseCase>(),
+      downloadFileUseCase: context.read<IDownloadFileUseCase>(),
+      uploadFileUseCase: context.read<IUploadFileUseCase>(),
+      downloadThumbnailUseCase: context.read<IDownloadThumbnailUseCase>(),
+      deleteRemoteFileUseCase: context.read<IDeleteRemoteFileUseCase>(),
+      deleteLocalFileUseCase: context.read<IDeleteLocalFileUseCase>(),
+      getLatestFileVersion: context.read<IGetLatestFileVersionUseCase>(),
+      recordFileVersion: context.read<IRecordFileVersionUseCase>(),
+      recordEvent: context.read<IRecordEventUseCase>(),
+      profile: widget.profile,
+      ownerId: widget.ownerId,
+    )..resetFilters();
+    _initialized = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _vm.loadRemoteFiles();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) =>
-          BrowserViewModel(
-              getRemoteFiles: context.read<IGetRemoteFilesUseCase>(),
-              getLocalFiles: context.read<IGetLocalFilesUseCase>(),
-              getLocalFileDetails: context.read<IGetLocalFileDetailsUseCase>(),
-              downloadFileUseCase: context.read<IDownloadFileUseCase>(),
-              uploadFileUseCase: context.read<IUploadFileUseCase>(),
-              downloadThumbnailUseCase: context
-                  .read<IDownloadThumbnailUseCase>(),
-              deleteRemoteFileUseCase: context.read<IDeleteRemoteFileUseCase>(),
-              deleteLocalFileUseCase: context.read<IDeleteLocalFileUseCase>(),
-              getLatestFileVersion: context
-                  .read<IGetLatestFileVersionUseCase>(),
-              recordFileVersion: context.read<IRecordFileVersionUseCase>(),
-              profile: profile,
-              ownerId: ownerId,
-            )
-            ..resetFilters()
-            ..loadRemoteFiles(),
-      child: _RemoteBrowserBody(profile: profile, ownerId: ownerId),
+    return ChangeNotifierProvider<BrowserViewModel>.value(
+      value: _vm,
+      child: _RemoteBrowserBody(
+        profile: widget.profile,
+        ownerId: widget.ownerId,
+      ),
     );
   }
 }
@@ -88,6 +109,65 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showPathEditor(
+    BuildContext context,
+    BrowserViewModel vm,
+  ) async {
+    final controller = TextEditingController(text: vm.currentPath);
+    final title = vm.isLocalDestination
+        ? 'Cambiar carpeta local'
+        : 'Ir a carpeta remota';
+    final hint = vm.isLocalDestination
+        ? '/storage/emulated/0/Downloads'
+        : '/backup';
+
+    final path = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.go,
+            decoration: InputDecoration(labelText: 'Ruta', hintText: hint),
+            onSubmitted: (_) {
+              Navigator.of(dialogContext).pop(controller.text);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('Ir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (path == null || !mounted) return;
+
+    if (vm.isLocalDestination) {
+      await vm.setLocalPath(path);
+    } else {
+      await vm.setRemotePath(path);
+    }
+  }
+
+  Future<void> _pickLocalFolder(BrowserViewModel vm) async {
+    if (!vm.isLocalDestination) return;
+    final selected = await getDirectoryPath(
+      initialDirectory: vm.currentLocalPath,
+      confirmButtonText: 'Usar carpeta',
+    );
+    if (selected == null || !mounted) return;
+    await vm.setLocalPath(selected);
   }
 
   void _handleScroll() {
@@ -140,6 +220,7 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         toolbarHeight: 72,
         leading: vm.isSelectionMode
@@ -157,13 +238,6 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
               vm.isSelectionMode
                   ? '${vm.selectedCount} seleccionado${vm.selectedCount == 1 ? '' : 's'}'
                   : widget.profile.name,
-            ),
-            Text(
-              vm.currentPath,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.onSurfaceMuted,
-              ),
             ),
           ],
         ),
@@ -237,11 +311,16 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
               ),
             ),
           _DestinationBar(vm: vm),
-          if (vm.currentPath != '/')
-            _PathBar(
-              path: vm.currentPath,
-              onGoUp: vm.isLocalDestination ? vm.goUpLocal : vm.goUpRemote,
-            ),
+          _PathBar(
+            path: vm.currentPath,
+            isLocal: vm.isLocalDestination,
+            canGoUp: vm.isLocalDestination ? vm.canGoUpLocal : vm.canGoUpRemote,
+            onGoUp: vm.isLocalDestination ? vm.goUpLocal : vm.goUpRemote,
+            onEditPath: () => _showPathEditor(context, vm),
+            onPickFolder: vm.isLocalDestination
+                ? () => _pickLocalFolder(vm)
+                : null,
+          ),
           _FilterBar(vm: vm),
           if (vm.isTransferring)
             LinearProgressIndicator(
@@ -523,6 +602,8 @@ class _RemoteBrowserBodyState extends State<_RemoteBrowserBody> {
               vm.downloadFile(file, onProgress: onProgress),
           profile: vm.profile,
           downloadFileUseCase: context.read<IDownloadFileUseCase>(),
+          recordEvent: context.read<IRecordEventUseCase>(),
+          ownerId: widget.ownerId,
         ),
       ),
     );
@@ -808,19 +889,50 @@ class _FilterBar extends StatelessWidget {
 
 class _PathBar extends StatelessWidget {
   final String path;
+  final bool isLocal;
+  final bool canGoUp;
   final VoidCallback onGoUp;
+  final VoidCallback onEditPath;
+  final VoidCallback? onPickFolder;
 
-  const _PathBar({required this.path, required this.onGoUp});
+  const _PathBar({
+    required this.path,
+    required this.isLocal,
+    required this.canGoUp,
+    required this.onGoUp,
+    required this.onEditPath,
+    this.onPickFolder,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppTheme.surfaceVariant,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
-          IconButton(onPressed: onGoUp, icon: const Icon(Icons.arrow_upward)),
-          Expanded(child: Text(path)),
+          IconButton(
+            tooltip: 'Subir un nivel',
+            onPressed: canGoUp ? onGoUp : null,
+            icon: const Icon(Icons.arrow_upward),
+          ),
+          IconButton(
+            tooltip: 'Editar ruta',
+            onPressed: onEditPath,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          if (isLocal && onPickFolder != null)
+            IconButton(
+              tooltip: 'Elegir carpeta',
+              onPressed: onPickFolder,
+              icon: const Icon(Icons.folder_open_outlined),
+            ),
+          Expanded(
+            child: GestureDetector(
+              onTap: onEditPath,
+              child: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
         ],
       ),
     );

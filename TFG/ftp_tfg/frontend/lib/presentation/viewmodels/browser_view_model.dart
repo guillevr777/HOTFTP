@@ -8,6 +8,7 @@ import '../../domain/entities/file_version.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/local_file.dart';
 import '../../domain/entities/remote_file.dart';
+import '../../domain/entities/system_event.dart';
 import '../../domain/interfaces/i_download_file_use_case.dart';
 import '../../domain/interfaces/i_download_thumbnail_use_case.dart';
 import '../../domain/interfaces/i_delete_local_file_use_case.dart';
@@ -17,6 +18,7 @@ import '../../domain/interfaces/i_get_local_file_details_use_case.dart';
 import '../../domain/interfaces/i_get_local_files_use_case.dart';
 import '../../domain/interfaces/i_get_remote_files_use_case.dart';
 import '../../domain/interfaces/i_record_file_version_use_case.dart';
+import '../../domain/interfaces/i_record_event_use_case.dart';
 import '../../domain/interfaces/i_upload_file_use_case.dart';
 import '../../core/services/android_storage_access.dart';
 import '../../utils/file_utils.dart';
@@ -61,6 +63,7 @@ class BrowserViewModel extends ChangeNotifier {
   final IDeleteLocalFileUseCase deleteLocalFileUseCase;
   final IGetLatestFileVersionUseCase getLatestFileVersion;
   final IRecordFileVersionUseCase recordFileVersion;
+  final IRecordEventUseCase recordEvent;
   final FtpProfile profile;
   final String ownerId;
 
@@ -111,6 +114,7 @@ class BrowserViewModel extends ChangeNotifier {
     required this.deleteLocalFileUseCase,
     required this.getLatestFileVersion,
     required this.recordFileVersion,
+    required this.recordEvent,
     required this.profile,
     required this.ownerId,
   });
@@ -119,6 +123,13 @@ class BrowserViewModel extends ChangeNotifier {
   bool get isRemoteDestination => destination == BrowserDestination.remote;
   String get currentPath =>
       isLocalDestination ? currentLocalPath : currentRemotePath;
+  bool get canGoUpRemote => currentRemotePath != '/';
+  bool get canGoUpLocal {
+    final normalized = _normalizeLocalPath(currentLocalPath);
+    final parent = p.dirname(normalized);
+    return parent.isNotEmpty && parent != normalized;
+  }
+
   int get selectedCount => isLocalDestination
       ? selectedLocalPaths.length
       : selectedRemotePaths.length;
@@ -370,6 +381,12 @@ class BrowserViewModel extends ChangeNotifier {
         ),
       );
       downloadProgress = 1;
+      await _trackEvent(
+        eventType: 'file_downloaded',
+        severity: SystemEventSeverity.success,
+        title: 'Archivo descargado',
+        message: 'Se descargó "${file.name}" en "$currentLocalPath".',
+      );
     } catch (e) {
       error = 'Error al descargar: $e';
     }
@@ -429,6 +446,13 @@ class BrowserViewModel extends ChangeNotifier {
         profile,
       );
       uploadProgress = 1;
+      await _trackEvent(
+        eventType: 'file_uploaded',
+        severity: SystemEventSeverity.success,
+        title: 'Archivo subido',
+        message:
+            'Se subió "$localFileName" a "$currentRemotePath" desde "$currentLocalPath".',
+      );
       _remoteCache.remove(currentRemotePath);
       await loadRemoteFiles();
     } catch (e) {
@@ -501,6 +525,18 @@ class BrowserViewModel extends ChangeNotifier {
         clearSelection(notify: false);
         await loadLocalFiles(forceRefresh: true);
       }
+      if (deleted > 0) {
+        await _trackEvent(
+          eventType: isRemoteDestination
+              ? 'remote_files_deleted'
+              : 'local_files_deleted',
+          severity: SystemEventSeverity.warning,
+          title: 'Archivos eliminados',
+          message: isRemoteDestination
+              ? 'Se eliminaron $deleted archivo${deleted == 1 ? '' : 's'} del remoto.'
+              : 'Se eliminaron $deleted archivo${deleted == 1 ? '' : 's'} del almacenamiento local.',
+        );
+      }
     } catch (e) {
       error = 'Error al eliminar: $e';
     } finally {
@@ -518,6 +554,14 @@ class BrowserViewModel extends ChangeNotifier {
   Future<void> navigateLocal(LocalFile folder) async {
     if (!folder.isDirectory) return;
     await loadLocalFiles(path: folder.path);
+  }
+
+  Future<void> setRemotePath(String path) async {
+    await loadRemoteFiles(path: path);
+  }
+
+  Future<void> setLocalPath(String path) async {
+    await loadLocalFiles(path: path);
   }
 
   void goUpRemote() {
@@ -824,8 +868,7 @@ class BrowserViewModel extends ChangeNotifier {
   }
 
   Future<void> _trackFileVersions() async {
-    if (profile.id == null ||
-        profile.transportType == FtpTransportType.direct) {
+    if (profile.id == null) {
       return;
     }
     for (final file in remoteFiles.where((file) => !file.isDirectory)) {
@@ -858,6 +901,29 @@ class BrowserViewModel extends ChangeNotifier {
       } catch (e) {
         debugPrint('Error registrando version de ${file.name}: $e');
       }
+    }
+  }
+
+  Future<void> _trackEvent({
+    required String eventType,
+    required SystemEventSeverity severity,
+    required String title,
+    required String message,
+  }) async {
+    try {
+      await recordEvent.execute(
+        SystemEvent(
+          ownerId: ownerId,
+          eventType: eventType,
+          severity: severity,
+          title: title,
+          message: message,
+          relatedProfileId: profile.id,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } catch (_) {
+      // La monitorización no debe afectar a la navegación ni a las transferencias.
     }
   }
 

@@ -28,27 +28,35 @@ class SyncScreen extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (context) => SyncViewModel(
-            detectConflicts: context.read<IDetectConflictsUseCase>(),
-            saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
-            getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
-            getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
-            evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
-            recordEvent: context.read<IRecordEventUseCase>(),
-            createAlert: context.read<ICreateAlertUseCase>(),
-            profile: profile,
-            ownerId: ownerId,
-            transferService: context.read<DumpTransferService>(),
-          ),
+          create: (context) {
+            final vm = SyncViewModel(
+              detectConflicts: context.read<IDetectConflictsUseCase>(),
+              saveSyncRecord: context.read<ISaveSyncRecordUseCase>(),
+              getSyncHistory: context.read<IGetSyncHistoryUseCase>(),
+              getActiveAlerts: context.read<IGetActiveAlertsUseCase>(),
+              evaluateSyncRules: context.read<IEvaluateSyncRulesUseCase>(),
+              recordEvent: context.read<IRecordEventUseCase>(),
+              createAlert: context.read<ICreateAlertUseCase>(),
+              profile: profile,
+              ownerId: ownerId,
+              transferService: context.read<DumpTransferService>(),
+            );
+            return vm;
+          },
         ),
         ChangeNotifierProvider(
-          create: (context) => DumpScheduleViewModel(
-            getDumpScheduleForProfile: context
-                .read<IGetDumpScheduleForProfileUseCase>(),
-            saveDumpSchedule: context.read<ISaveDumpScheduleUseCase>(),
-            profile: profile,
-            ownerId: ownerId,
-          )..loadSchedule(),
+          create: (context) {
+            final vm = DumpScheduleViewModel(
+              getDumpScheduleForProfile: context
+                  .read<IGetDumpScheduleForProfileUseCase>(),
+              saveDumpSchedule: context.read<ISaveDumpScheduleUseCase>(),
+              recordEvent: context.read<IRecordEventUseCase>(),
+              profile: profile,
+              ownerId: ownerId,
+            );
+            Future.microtask(vm.loadSchedule);
+            return vm;
+          },
         ),
       ],
       child: _SyncBody(profile: profile),

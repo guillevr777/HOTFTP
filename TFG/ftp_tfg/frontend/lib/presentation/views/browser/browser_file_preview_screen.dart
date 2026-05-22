@@ -13,6 +13,8 @@ import '../../../utils/thumbnail_utils.dart';
 
 import '../../../domain/entities/ftp_profile.dart';
 import '../../../domain/entities/remote_file.dart';
+import '../../../domain/entities/system_event.dart';
+import '../../../domain/interfaces/i_record_event_use_case.dart';
 import '../../../theme/app_theme.dart';
 import '../../../utils/file_utils.dart';
 import '../../../domain/interfaces/i_download_file_use_case.dart';
@@ -22,6 +24,8 @@ class BrowserFilePreviewScreen extends StatefulWidget {
   final Future<void> Function(void Function(double progress) onProgress) onDownload;
   final FtpProfile profile;
   final IDownloadFileUseCase downloadFileUseCase;
+  final IRecordEventUseCase? recordEvent;
+  final String? ownerId;
 
   const BrowserFilePreviewScreen({
     super.key,
@@ -29,6 +33,8 @@ class BrowserFilePreviewScreen extends StatefulWidget {
     required this.onDownload,
     required this.profile,
     required this.downloadFileUseCase,
+    this.recordEvent,
+    this.ownerId,
   });
 
   @override
@@ -416,7 +422,31 @@ class _BrowserFilePreviewScreenState extends State<BrowserFilePreviewScreen> {
         .execute(widget.file, sourceDir.path, widget.profile)
         .timeout(_previewDownloadTimeout);
 
+    await _trackPreviewEvent();
+
     return sourcePath;
+  }
+
+  Future<void> _trackPreviewEvent() async {
+    final recordEvent = widget.recordEvent;
+    final ownerId = widget.ownerId;
+    if (recordEvent == null || ownerId == null) return;
+
+    try {
+      await recordEvent.execute(
+        SystemEvent(
+          ownerId: ownerId,
+          eventType: 'file_previewed',
+          severity: SystemEventSeverity.info,
+          title: 'Archivo previsualizado',
+          message: 'Se generó una vista previa de "${widget.file.name}".',
+          relatedProfileId: widget.profile.id,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } catch (_) {
+      // La vista previa no debe romper la navegación si la monitorización falla.
+    }
   }
 
   Future<void> _initPreview() async {

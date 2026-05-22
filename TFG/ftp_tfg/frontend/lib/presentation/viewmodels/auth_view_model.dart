@@ -178,31 +178,31 @@ class AuthViewModel extends ChangeNotifier {
         final details = message.split('] ').last;
         switch (details) {
           case 'operation-not-allowed':
-            return 'La recuperaciÃ³n por correo no estÃ¡ habilitada en Firebase.';
+            return 'La recuperación por correo no está habilitada en Firebase.';
           case 'too-many-requests':
             return 'Se han hecho demasiados intentos. Espera un poco y vuelve a probar.';
           case 'provider-already-linked':
-            return 'La cuenta ya tiene este mÃ©todo de acceso vinculado.';
+            return 'La cuenta ya tiene este método de acceso vinculado.';
           case 'missing-email':
-            return 'La cuenta actual no tiene un correo vÃ¡lido para enlazar.';
+            return 'La cuenta actual no tiene un correo válido para enlazar.';
           case 'credential-already-in-use':
             return 'Ese correo ya pertenece a otra cuenta.';
           case 'email-already-in-use':
-            return 'Ese correo ya estÃ¡ registrado.';
+            return 'Ese correo ya está registrado.';
           case 'invalid-email':
-            return 'El correo no tiene un formato vÃ¡lido.';
+            return 'El correo no tiene un formato válido.';
           case 'invalid-recipient-email':
-            return 'El correo de destino no es vÃ¡lido para recuperar contraseÃ±a.';
+            return 'El correo de destino no es válido para recuperar contraseña.';
           case 'weak-password':
-            return 'La contraseÃ±a es demasiado dÃ©bil.';
+            return 'La contraseña es demasiado débil.';
           case 'requires-recent-login':
-            return 'Vuelve a iniciar sesiÃ³n para completar esta acciÃ³n.';
+            return 'Vuelve a iniciar sesión para completar esta acción.';
           case 'no-password-provider-linked':
-            return 'Esta cuenta usa Google y aÃºn no tiene una contraseÃ±a vinculada.';
+            return 'Esta cuenta usa Google y aún no tiene una contraseña vinculada.';
           case 'user-not-found':
             return 'No existe ninguna cuenta asociada a ese correo.';
           case 'network-request-failed':
-            return 'No se pudo comprobar el acceso de la cuenta. Revisa la conexiÃ³n e intÃ©ntalo de nuevo.';
+            return 'No se pudo comprobar el acceso de la cuenta. Revisa la conexión e inténtalo de nuevo.';
           default:
             return details;
         }

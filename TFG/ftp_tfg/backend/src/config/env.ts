@@ -19,9 +19,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): AppEnv {
     port: Number(source.PORT ?? 3000),
     databaseUrl: source.DATABASE_URL,
     databaseSsl: String(source.DATABASE_SSL ?? 'false').toLowerCase() === 'true',
-    demoUserEmail: source.API_DEMO_EMAIL ?? 'demo@hotftp.local',
-    demoUserPassword: source.API_DEMO_PASSWORD ?? 'demo123',
-    demoUserDisplayName: source.API_DEMO_DISPLAY_NAME ?? 'HOTFTP Demo',
+    demoUserEmail: source.API_DEMO_EMAIL ?? '__SET_IN_RENDER__',
+    demoUserPassword: source.API_DEMO_PASSWORD ?? '__SET_IN_RENDER__',
+    demoUserDisplayName: source.API_DEMO_DISPLAY_NAME ?? '__SET_IN_RENDER__',
     ftp: {
       host: source.FTP_HOST ?? '127.0.0.1',
       port: Number(source.FTP_PORT ?? 21),

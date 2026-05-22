@@ -22,7 +22,7 @@ class BuildSystemHealthReport implements IBuildSystemHealthReportUseCase {
     required DateTime generatedAt,
   }) {
     final buffer = StringBuffer()
-      ..writeln('HOTFTP - Informe tÃ©cnico')
+      ..writeln('HOTFTP - Informe técnico')
       ..writeln('Generado: ${generatedAt.toIso8601String()}')
       ..writeln()
       ..writeln('Resumen general')
@@ -32,10 +32,10 @@ class BuildSystemHealthReport implements IBuildSystemHealthReportUseCase {
       ..writeln('- Alertas activas: ${summary.unresolvedAlerts}')
       ..writeln('- Sincronizaciones con error: ${summary.errorSyncs}')
       ..writeln(
-        '- Ãšltima sincronizaciÃ³n: ${summary.lastSyncAt?.toIso8601String() ?? 'Sin datos'}',
+        '- Última sincronización: ${summary.lastSyncAt?.toIso8601String() ?? 'Sin datos'}',
       )
       ..writeln(
-        '- Ãšltimo evento: ${summary.lastEventAt?.toIso8601String() ?? 'Sin datos'}',
+        '- Último evento: ${summary.lastEventAt?.toIso8601String() ?? 'Sin datos'}',
       )
       ..writeln();
 
@@ -43,7 +43,7 @@ class BuildSystemHealthReport implements IBuildSystemHealthReportUseCase {
       buffer
         ..writeln('Patrones de uso')
         ..writeln(
-          '- Tasa de Ã©xito: ${(usageStats.successRate * 100).toStringAsFixed(0)}%',
+          '- Tasa de éxito: ${(usageStats.successRate * 100).toStringAsFixed(0)}%',
         )
         ..writeln('- Sincronizaciones correctas: ${usageStats.successfulSyncs}')
         ..writeln('- Fallos: ${usageStats.failedSyncs}')
@@ -54,7 +54,7 @@ class BuildSystemHealthReport implements IBuildSystemHealthReportUseCase {
           '- Hora pico: ${usageStats.peakHour == null ? 'Sin datos' : '${usageStats.peakHour!.toString().padLeft(2, '0')}:00'}',
         )
         ..writeln(
-          '- Perfil mÃ¡s activo: ${usageStats.topProfileName ?? 'Sin datos'}',
+          '- Perfil más activo: ${usageStats.topProfileName ?? 'Sin datos'}',
         )
         ..writeln(
           '- Sincronizaciones del perfil principal: ${usageStats.topProfileSyncs}',

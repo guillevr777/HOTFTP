@@ -35,7 +35,7 @@ class FtpNativeChannel {
       // Convertir List<dynamic> a List<Map<String,dynamic>>
       return (result ?? []).map((e) {
         final map = Map<String, dynamic>.from(e as Map);
-        // AsegÃºrate que tenga todos los campos
+        // Asegúrate de que tenga todos los campos
         return {
           "name": map["name"] ?? "",
           "size": map["size"] ?? 0,
