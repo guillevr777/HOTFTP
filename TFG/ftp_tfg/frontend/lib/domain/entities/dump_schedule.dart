@@ -2,7 +2,7 @@ enum DumpSourceSide { local, remote }
 
 enum DumpTransferMode { oneWay, syncBoth }
 
-enum DumpIntervalUnit { hours, days }
+enum DumpIntervalUnit { minutes, hours, days }
 
 class DumpSchedule {
   final int? id;
@@ -70,6 +70,7 @@ class DumpSchedule {
 
   DateTime calculateNextRun(DateTime from) {
     final duration = switch (intervalUnit) {
+      DumpIntervalUnit.minutes => Duration(minutes: intervalValue),
       DumpIntervalUnit.hours => Duration(hours: intervalValue),
       DumpIntervalUnit.days => Duration(days: intervalValue),
     };

@@ -264,6 +264,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
 
   String _intervalUnitLabel(DumpIntervalUnit unit) {
     return switch (unit) {
+      DumpIntervalUnit.minutes => 'minuto${intervalValue == 1 ? '' : 's'}',
       DumpIntervalUnit.hours => 'hora${intervalValue == 1 ? '' : 's'}',
       DumpIntervalUnit.days => 'día${intervalValue == 1 ? '' : 's'}',
     };

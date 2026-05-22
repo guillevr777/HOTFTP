@@ -178,12 +178,16 @@ class SystemHealthViewModel extends ChangeNotifier {
     required DumpSchedule schedule,
   }) {
     final cadenceUnit = schedule.intervalValue == 1
-        ? schedule.intervalUnit == DumpIntervalUnit.hours
-            ? 'hora'
-            : 'día'
-        : schedule.intervalUnit == DumpIntervalUnit.hours
-            ? 'horas'
-            : 'días';
+        ? switch (schedule.intervalUnit) {
+            DumpIntervalUnit.minutes => 'minuto',
+            DumpIntervalUnit.hours => 'hora',
+            DumpIntervalUnit.days => 'día',
+          }
+        : switch (schedule.intervalUnit) {
+            DumpIntervalUnit.minutes => 'minutos',
+            DumpIntervalUnit.hours => 'horas',
+            DumpIntervalUnit.days => 'días',
+          };
     final transferModeLabel = schedule.transferMode == DumpTransferMode.syncBoth
         ? 'bidireccional'
         : schedule.sourceSide == DumpSourceSide.local

@@ -68,7 +68,7 @@ export const dumpScheduleSchema = z.object({
   transferMode: z.enum(['oneWay', 'syncBoth']),
   deleteSourceAfterCopy: z.coerce.boolean().default(false),
   intervalValue: z.coerce.number().int().positive().default(24),
-  intervalUnit: z.enum(['hours', 'days']).default('hours'),
+  intervalUnit: z.enum(['minutes', 'hours', 'days']).default('hours'),
   lastRunAt: z.preprocess(
     (value) => value === null || value === undefined || value === ''
       ? undefined

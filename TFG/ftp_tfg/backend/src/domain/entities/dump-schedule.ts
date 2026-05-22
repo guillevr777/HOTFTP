@@ -1,6 +1,6 @@
 export type DumpSourceSide = 'local' | 'remote';
 export type DumpTransferMode = 'oneWay' | 'syncBoth';
-export type DumpIntervalUnit = 'hours' | 'days';
+export type DumpIntervalUnit = 'minutes' | 'hours' | 'days';
 
 export interface DumpSchedule {
   id?: number;

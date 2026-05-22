@@ -347,7 +347,7 @@ class _ScheduleEditor extends StatelessWidget {
             if (nextRun != null && scheduleVm.enabled) ...[
               const SizedBox(height: 4),
               Text(
-                'Proxima ejecucion: ${_formatDateTime(nextRun)}',
+                'Proxima ejecucion: ${_formatDateTime(nextRun.toLocal())}',
                 style: const TextStyle(color: AppTheme.onSurfaceMuted),
               ),
             ],
@@ -439,6 +439,10 @@ class _ScheduleEditor extends StatelessWidget {
                 DropdownButton<DumpIntervalUnit>(
                   value: scheduleVm.intervalUnit,
                   items: const [
+                    DropdownMenuItem(
+                      value: DumpIntervalUnit.minutes,
+                      child: Text('minutos'),
+                    ),
                     DropdownMenuItem(
                       value: DumpIntervalUnit.hours,
                       child: Text('horas'),
