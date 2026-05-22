@@ -118,10 +118,27 @@ class HybridFtpRepositoryImpl implements FtpRepository {
   Future<DumpSchedule?> getDumpScheduleForProfile(
     String ownerId,
     FtpProfile profile,
-  ) => remoteRepository.getDumpScheduleForProfile(ownerId, profile);
+  ) async {
+    try {
+      final remote = await remoteRepository.getDumpScheduleForProfile(
+        ownerId,
+        profile,
+      );
+      if (remote != null) return remote;
+    } catch (_) {
+      // Las programaciones pueden seguir funcionando localmente si la API no
+      // reconoce todavia alguna unidad nueva, como los minutos.
+    }
+    return localRepository.getDumpScheduleForProfile(ownerId, profile);
+  }
 
   @override
-  Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) =>
-      remoteRepository.saveDumpSchedule(schedule, profile);
+  Future<int> saveDumpSchedule(DumpSchedule schedule, FtpProfile profile) async {
+    try {
+      return await remoteRepository.saveDumpSchedule(schedule, profile);
+    } catch (_) {
+      return localRepository.saveDumpSchedule(schedule, profile);
+    }
+  }
 }
 
