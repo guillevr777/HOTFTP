@@ -695,10 +695,12 @@ class DumpTransferService {
       if (local.size == remote.size) return _TransferDirection.skip;
       return _TransferDirection.upload;
     }
-    if (localDate != null && remoteDate == null)
+    if (localDate != null && remoteDate == null) {
       return _TransferDirection.upload;
-    if (localDate == null && remoteDate != null)
+    }
+    if (localDate == null && remoteDate != null) {
       return _TransferDirection.download;
+    }
     if (local.size == remote.size) return _TransferDirection.skip;
     return _TransferDirection.upload;
   }

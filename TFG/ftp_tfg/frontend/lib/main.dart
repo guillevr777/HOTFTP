@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/di/injection_container.dart';
+import 'core/services/dump_schedule_background_service.dart';
 import 'firebase_options.dart';
 import 'presentation/views/auth/auth_gate.dart';
 import 'theme/app_theme.dart';
@@ -10,6 +11,7 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await const DumpScheduleBackgroundService().initialize();
   runApp(const MyApp());
 }
 

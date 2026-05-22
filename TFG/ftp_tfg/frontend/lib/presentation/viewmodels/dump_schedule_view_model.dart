@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:universal_io/io.dart';
 
+import '../../core/services/android_storage_access.dart';
+import '../../core/services/dump_schedule_background_service.dart';
 import '../../domain/entities/dump_schedule.dart';
 import '../../domain/entities/ftp_profile.dart';
 import '../../domain/entities/system_event.dart';
@@ -16,6 +18,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
   final IRecordEventUseCase recordEvent;
   final FtpProfile profile;
   final String ownerId;
+  final DumpScheduleBackgroundService backgroundService;
 
   static String get _defaultLocalPath =>
       Platform.isAndroid ? '/storage/emulated/0' : Directory.current.path;
@@ -26,6 +29,7 @@ class DumpScheduleViewModel extends ChangeNotifier {
     required this.recordEvent,
     required this.profile,
     required this.ownerId,
+    this.backgroundService = const DumpScheduleBackgroundService(),
   });
 
   DumpSchedule? schedule;
@@ -153,6 +157,15 @@ class DumpScheduleViewModel extends ChangeNotifier {
     successMessage = null;
     notifyListeners();
     try {
+      if (enabled) {
+        final hasAccess = await AndroidStorageAccess.ensureScheduledDumpAccess();
+        if (!hasAccess) {
+          error =
+              'No se pudo activar el volcado programado porque faltan permisos de archivos o bateria.';
+          return;
+        }
+      }
+
       final isNewSchedule = schedule?.id == null;
       final now = DateTime.now();
       final nextRun = enabled
@@ -188,6 +201,11 @@ class DumpScheduleViewModel extends ChangeNotifier {
 
       final id = await saveDumpSchedule.execute(updated, profile);
       schedule = updated.copyWith(id: id);
+      if (enabled) {
+        await backgroundService.schedule(schedule!, profile);
+      } else {
+        await backgroundService.cancel(schedule!);
+      }
       successMessage = enabled
           ? 'Volcado recurrente guardado'
           : 'Volcado recurrente desactivado';

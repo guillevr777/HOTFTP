@@ -33,4 +33,23 @@ class AndroidStorageAccess {
       return false;
     }
   }
+
+  static Future<bool> ensureScheduledDumpAccess() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+
+    final hasStorage = await ensureSharedStorageAccess();
+    if (!hasStorage) return false;
+
+    try {
+      final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+      if (batteryStatus.isGranted) return true;
+
+      final requestStatus = await Permission.ignoreBatteryOptimizations
+          .request();
+      return requestStatus.isGranted || requestStatus.isLimited;
+    } on MissingPluginException catch (e) {
+      debugPrint('HOTFTP: battery optimization permission unavailable -> $e');
+      return true;
+    }
+  }
 }
